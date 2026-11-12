@@ -29,6 +29,13 @@ The story runs through three connected districts — the Research Courtyard, the
 the Gravity Tower — with checkpoints and automatic saving (localStorage). The **Sandbox** on the
 main menu is a test range with every pigment unlocked (`C` spawns crates).
 
+Saving records the checkpoint, pigments, objectives and the state of every machine. Paint itself
+persists for the whole session and is repainted onto powered receptors when a save is loaded;
+free-form paint on walls and floors is not written to disk.
+
+Requires a desktop browser with WebGL2 and WebAssembly. If the frame rate stays low the game
+switches itself to the Performance preset (also selectable in the menu).
+
 ## Build and deploy
 
 ```bash
@@ -47,9 +54,12 @@ npm run build && npm test          # all gameplay tests
 npm test -- ice                    # only tests whose name contains "ice"
 ```
 
-`tests/run.mjs` drives the real game headlessly (Playwright + Chromium, software WebGL) and
-asserts that each pigment changes behaviour, that the combinations work, and that puzzles,
-checkpoints, respawning and save/restore function. Playwright is expected to be available in the
+`tests/run.mjs` drives the real game headlessly (Playwright + Chromium, software WebGL). Twenty
+tests assert that each pigment changes behaviour, that combinations work (float + mag-line,
+growth + bounce, float + pulse, stacking), that every gate of the story can be passed, and that
+checkpoints, respawning, save/continue and restart function. One test plays the opening with no
+shortcuts — walking, jumping, aiming and spraying — to confirm the first set piece is reachable
+inside a minute. Playwright is expected to be available in the
 environment (`npm i -D playwright` otherwise).
 
 ## Architecture

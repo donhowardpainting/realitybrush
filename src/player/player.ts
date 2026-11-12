@@ -183,7 +183,7 @@ export class Player {
       this.accelerate(wx, wz, Math.min(maxSp, WALK), 2.4, dt);
       v.y -= GRAVITY * this.gravScale * (this.lowG ? 0.4 : 1) * dt;
       if (v.y < -45) v.y = -45;
-      if (this.gravScale < 0 && v.y > 3.2) v.y = 3.2;
+      if (this.gravScale < 0 && v.y > 5) v.y = 5;
     }
     if (this.jumpBuf > 0 && (wasGrounded || this.coyote > 0)) {
       v.y = JUMP + Math.max(0, this.platVel.y);

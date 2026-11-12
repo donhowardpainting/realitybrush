@@ -236,7 +236,7 @@ export class Game {
     this.stage.pulse(0xffffff, 0.9);
     this.audio.finale();
     this.audio.setRestore(1);
-    this.player.gravScale = -0.1;
+    this.player.gravScale = -0.25; // the tower lets go of you: rise out of the shaft and see the city
     this.player.vel.y = 2;
     this.player.grounded = false;
     for (const d of this.dynamics.bodies) if (!d.captured) { d.p.fill(Paint.Purple); this.paint.markDirty(d.p); }
@@ -382,7 +382,7 @@ export class Game {
     if (this.hintQueue && playing && (this.hintQueue.t -= dt) <= 0) { this.hud.hint(this.hintQueue.html, 9); this.hintQueue = null; }
     if (this.finaleT >= 0 && playing) {
       this.finaleT += dt;
-      if (this.finaleT > 9) {
+      if (this.finaleT > 9.5) {
         this.finaleT = -1;
         this.save();
         this.state = 'ending';

@@ -78,6 +78,36 @@ const tests = {
     return { rest: r2(rest), top: r2(top), afterSolvent: r2(back) };
   },
 
+  async first_minute_with_the_real_gun() {
+    // No test shortcuts here: walk, jump, aim and spray exactly as a player would.
+    g.start('new'); g.simulate(0.3);
+    const mass = dyn('mass');
+    let t = 0; const step = (s) => { g.simulate(s); t += s; };
+    g.input.press('KeyW');
+    while (t < 20 && !(g.player.feetY > 1.1 && g.player.pos.z < -10.5)) {
+      if (g.player.grounded && g.player.feetY < 1 && g.player.pos.z < -6.4) g.input.press('Space');
+      step(1 / 30);
+      g.input.release('Space');
+    }
+    g.input.release('KeyW'); step(1);
+    check(g.player.feetY > 1.1 && g.player.grounded, 'player should hop onto the hanging mass, at ' + g.player.pos.toArray().map(r2));
+    g.player.pitch = -1.15;
+    g.input.press('Mouse0');
+    // keep sweeping the spray around your feet until the mass stops gaining lift
+    for (let i = 0; i < 420 && mass.lift < 1; i++) { g.player.yaw = Math.sin(i / 12) * 1.6 + i / 40; g.player.pitch = -1.05 + Math.cos(i / 7) * 0.3; step(1 / 30); }
+    g.input.release('Mouse0');
+    check(g.seen.has('mass:float') && mass.lift >= 1, 'spraying underfoot should fully lift the mass, lift=' + mass.lift);
+    while (t < 45 && mass.p.body.translation().y < 7.3) step(0.25);
+    check(Math.abs(g.player.feetY - 8) < 0.4, 'player rides up to walkway height, feet ' + g.player.feetY);
+    g.player.yaw = 0; g.player.pitch = 0;
+    g.input.press('KeyW');
+    while (t < 58 && !g.seen.has('zone:balcony')) { if (g.player.grounded && g.player.pos.z < -14) g.input.press('Space'); step(1 / 30); g.input.release('Space'); }
+    g.input.release('KeyW');
+    check(g.seen.has('zone:balcony'), 'reach the impossible walkway, at ' + g.player.pos.toArray().map(r2));
+    check(t < 60, 'the whole sequence fits inside the first minute, took ' + t);
+    return { seconds: r2(t), shots: g.gun.shots, lift: r2(mass.lift) };
+  },
+
   async purple_height_scales_with_coverage() {
     g.start('sandbox'); g.simulate(0.5);
     const crates = g.dynamics.bodies.filter((d) => d.p.tags.has('crate') && d.home.x > 250 && d.p.body.mass() === 45);

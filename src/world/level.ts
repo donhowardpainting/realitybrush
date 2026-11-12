@@ -125,7 +125,7 @@ export function buildWorld(game: Game, b: Builder): LevelDef {
   b.dbox(-1.2, 1.2, 14.15, 15.2, -13, -10.8, 'rust');
   b.lamp(0, 13.3, -11.9, 0xc9a0ff, 2.2, 15, 0.16);
   b.sign(['GRAVIMETRIC TEST MASS', '4,000 KG — LOAD-LOCKED CLAMPS', 'RELEASES ONLY AT ZERO WEIGHT'], -10.5, 3.2, -8.6, 'z+', 3.8, 1.5, '#c9a0ff', 1.1);
-  const mass = b.dyn(0, 0.75, -11.9, 6, 0.9, 6, 'mass', 4000, { maxHover: 7.1, fullAt: 0.14, lockTilt: true, tags: ['mass'] });
+  const mass = b.dyn(0, 0.75, -11.9, 6, 0.9, 6, 'mass', 4000, { maxHover: 7.1, fullAt: 0.075, lockTilt: true, tags: ['mass'] });
   mass.p.body.setLinearDamping(0.6);
   const ropeLen = 13.6 - 1.2;
   const anchors: [THREE.Vector3, THREE.Vector3][] = [];
@@ -583,8 +583,8 @@ export function buildWorld(game: Game, b: Builder): LevelDef {
     coreOrb.rotation.y = t * 0.6; coreOrb.rotation.x = t * 0.37;
     coreOrb.scale.setScalar(1 + done * 0.06 + Math.sin(t * 3) * 0.04 + (game.ended ? 0.5 : 0));
     (coreOrb.material as THREE.MeshStandardMaterial).emissiveIntensity = 1.5 + done * 0.8 + (game.ended ? 5 : 0);
-    coreLight.intensity = 30 + done * 14 + (game.ended ? 120 : 0);
-    for (const l of beamLights) l.intensity = 55 + stage.restore * 40 + done * 10 + Math.sin(t * 1.7 + l.position.y) * 6 + (game.ended ? 120 : 0);
+    coreLight.intensity = 30 + done * 14 + (game.ended ? 60 : 0);
+    for (const l of beamLights) l.intensity = 55 + stage.restore * 40 + done * 10 + Math.sin(t * 1.7 + l.position.y) * 6 + (game.ended ? 45 : 0);
     water.material.opacity = 0.9 + Math.sin(t) * 0.03;
     sandbox.frame(dt);
   };
