@@ -56,6 +56,7 @@ export class Game {
   private storyCp: Checkpoint | null = null;
   private barsT = 0;
   private finaleT = -1;
+  private slowT = 0;
   private hintQueue: { t: number; html: string } | null = null;
   playTime = 0;
   ended = false;
@@ -199,8 +200,8 @@ export class Game {
     this.hud.refreshUnlocked(p);
     this.gun.select(p, true);
     this.audio.unlock();
-    this.stage.pulse(info.hex, 0.45);
-    this.glow.burst(this.player.pos, null, info.color, 120, 9, 0.12, 1.4, 1, 2.5);
+    this.stage.pulse(info.hex, 0.3);
+    this.glow.burst(this.player.pos, null, info.color, 80, 8, 0.09, 1.2, 1, 1.5);
     this.hud.toast(`PIGMENT ACQUIRED — ${info.name}`, info.css);
     this.emit('pickup:' + info.key);
   }
@@ -332,6 +333,16 @@ export class Game {
     const dt = Math.min(0.1, (now - this.last) / 1000);
     this.last = now;
     this.fps += (1 / Math.max(dt, 0.001) - this.fps) * 0.05;
+    // safety net for weak GPUs: fall back to the performance preset if the frame rate stays low
+    if (this.state === 'playing' && this.settings.quality === 'high' && !this.flags.test) {
+      this.slowT = this.fps < 27 ? this.slowT + dt : 0;
+      if (this.slowT > 6) {
+        this.slowT = 0;
+        this.settings.quality = 'low';
+        this.applySettings(true);
+        this.hud.toast('PERFORMANCE MODE ENABLED — change it back in the pause menu', '#ffd21f');
+      }
+    }
     this.frame(dt);
     this.stage.render();
   }

@@ -192,10 +192,10 @@ export function buildWorld(game: Game, b: Builder): LevelDef {
   for (let i = 0; i < 7; i++) b.pipe(V(-2 + i * 0.66, 7.7, -37), V(-2 + i * 0.66 + rr(-0.3, 0.3), 7.7 + rr(-0.6, 0.2), -37 - rr(0.5, 1.5)), 0.025, 'rust', false, 4);
   b.dbox(-3, 3.2, 0, 0.6, -39.2, -33.5, 'concrete', true, [0.12, 0.3, 0.05]);
   b.rubble(1, 0, -36, 12, 2.6, 'concrete', 0.6);
-  b.box(-5, 5, 0, 2.5, -48, -40, 'brick');
-  b.dbox(-5.2, 5.2, 2.3, 2.5, -48.2, -39.8, 'concrete');
-  b.dbox(-1, 1, 0, 2.1, -39.95, -39.8, 'dark'); b.wallLamp(0, 2.2, -39.9, 'z+', 0xffd21f, 1.6, 7);
-  b.sign(['SUBSTATION 4', 'ROOF RATED FOR IMPACT TESTING'], 3, 1.5, -39.9, 'z+', 2.6, 0.9, '#ffd21f');
+  b.box(-5, 5, 0, 3, -49.5, -40.5, 'brick');
+  b.dbox(-5.2, 5.2, 2.8, 3, -49.7, -40.3, 'concrete');
+  b.dbox(-1, 1, 0, 2.2, -40.45, -40.3, 'dark'); b.wallLamp(0, 2.5, -40.4, 'z+', 0xffd21f, 1.6, 7);
+  b.sign(['SUBSTATION 4', 'ROOF RATED FOR IMPACT TESTING'], 3, 1.6, -40.4, 'z+', 2.6, 0.9, '#ffd21f');
   b.wall(-14, 14, 0, 6.5, -60, -51, 'concrete', ['z+'], { windows: false });
   b.sign(['PUMP HOUSE', 'SPILLWAY ACCESS ABOVE  ↑'], 0, 4.6, -50.9, 'z+', 5, 1.3, '#35c8ff');
   b.tank(-10.5, 6.5, -55.5, 1.8, 3.4); b.tank(10.5, 6.5, -55.5, 1.8, 3.4);
@@ -259,7 +259,7 @@ export function buildWorld(game: Game, b: Builder): LevelDef {
     b.box(-21.5, -12, 18, 19, z0, z1, 'concrete'); b.box(12, 21.5, 18, 19, z0, z1, 'concrete');
     b.dbox(-12, 12, 18.6, 18.7, z0, z1, 'glass', true);
     for (let x = -12; x <= 12; x += 4) b.dbox(x - 0.08, x + 0.08, 18.4, 18.9, z0, z1, 'steel');
-    for (const x of [-7, 0, 7]) stage.addShaft(V(x, 18.4, (z0 + z1) / 2), shaftDir, 21, 4.6, 0xffe6c0, 0.2);
+    for (const x of [-7, 0, 7]) stage.addShaft(V(x, 18.4, (z0 + z1) / 2), shaftDir, 21, 4.6, 0xffe6c0, 0.085);
   }
   b.box(-21.5, 14.9, 18, 19, -169.5, -162.8, 'concrete'); b.box(19.6, 21.5, 18, 19, -169.5, -162.8, 'concrete'); b.box(14.9, 19.6, 18, 19, -169.5, -167.6, 'concrete');
   for (const z of [-118, -132, -144, -158]) {
@@ -269,8 +269,10 @@ export function buildWorld(game: Game, b: Builder): LevelDef {
   }
   for (const z of [-125, -139, -151, -164]) { b.column(-19.6, z, 0, 18, 0.6, 'rust', false); b.column(19.6, z, 0, 18, 0.6, 'rust', false); }
   // emergency lighting until the bus comes up
-  for (const [x, z] of [[-19.9, -121], [-19.9, -146], [19.9, -125], [19.9, -155]]) b.wallLamp(x, 4.5, z, x < 0 ? 'x+' : 'x-', 0xff4030, 2.4, 12);
-  b.wallLamp(0, 6.5, -113.5, 'z-', 0xff4030, 2.4, 12);
+  for (const [x, z] of [[-19.9, -121], [-19.9, -134], [-19.9, -158], [19.9, -125], [19.9, -155], [19.9, -146]]) b.wallLamp(x, 4.5, z, x < 0 ? 'x+' : 'x-', 0xff4030, 4.5, 16);
+  b.wallLamp(0, 6.5, -113.5, 'z-', 0xff4030, 4.5, 16);
+  for (const [x, z] of [[-8, -160.1], [0, -160.1], [16, -160.1]]) b.wallLamp(x, 7, z, 'z+', 0xffb070, 3, 12);
+  b.lamp(-11, 5.6, -158.6, 0xffa040, 3.5, 12, 0); b.lamp(-6.6, 3.4, -118.4, 0xff5040, 2.5, 9, 0); b.lamp(7, 6.6, -142.6, 0xffc890, 3, 12, 0.12);
   const hallLights = [V(-8, 14, -128), V(8, 14, -140), V(-6, 14, -156)].map((p) => {
     const l = new THREE.PointLight(0xffe2b8, 0, 46, 1.4); l.position.copy(p); scene.add(l);
     const fx = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.3, 0.5, 12), mats.glow(0xffe2b8, 0.05));
@@ -372,10 +374,10 @@ export function buildWorld(game: Game, b: Builder): LevelDef {
   // --- greenhouse annex ---
   for (const [z0, z1] of [[-150, -139], [-139, -128]]) b.box(21.5, 36, -1, 0, z0, z1, 'pavers');
   b.box(21.5, 37.5, 0, 7, -151.5, -150, 'brick'); b.box(21.5, 37.5, 0, 7, -128, -126.5, 'brick'); b.box(36, 37.5, 0, 7, -150, -128, 'brick');
-  b.box(21.5, 36, 7, 7.25, -150, -128, 'glass' as any, { shadow: false });
+  b.dbox(21.5, 36, 7, 7.2, -150, -128, 'glass', true);
   for (let x = 21.5; x <= 36; x += 2.9) b.dbox(x - 0.07, x + 0.07, 6.85, 7.3, -150, -128, 'steel');
   for (let z = -150; z <= -128; z += 5.5) b.dbox(21.5, 36, 6.85, 7.3, z - 0.07, z + 0.07, 'steel');
-  for (const [x, z] of [[26, -146], [31, -134], [28.5, -139]]) stage.addShaft(V(x, 7, z), shaftDir, 8.5, 3.6, 0xdfffd0, 0.2);
+  for (const [x, z] of [[26, -146], [31, -134], [28.5, -139]]) stage.addShaft(V(x, 7, z), shaftDir, 8.5, 3.6, 0xdfffd0, 0.1);
   b.box(20, 21.5, -1, 0, -142, -136, 'steel');
   const shutter = b.kin(20.75, 2.25, -139, 1.3, 4.5, 6, 'rust');
   b.mover(shutter, V(20.75, 6.9, -139), 1.8, 'hold', busOn, 0, true);
@@ -448,6 +450,8 @@ export function buildWorld(game: Game, b: Builder): LevelDef {
   const halo = new THREE.Mesh(new THREE.CylinderGeometry(3, 3, 300, 20, 1, true), beamMat);
   halo.position.copy(beam.position); halo.scale.set(1, 1, 1); scene.add(halo);
   const coreLight = new THREE.PointLight(0xa070ff, 30, 40, 1.6); coreLight.position.set(0, 48, TZ); scene.add(coreLight);
+  // the beam itself lights the shaft
+  const beamLights = [23, 36, 62].map((y) => { const l = new THREE.PointLight(0xb9a0ff, 70, 36, 1.5); l.position.set(0, y, TZ); scene.add(l); return l; });
   // debris orbiting the beam
   const debris = new THREE.InstancedMesh(prep(new THREE.BoxGeometry(1, 1, 1)), mats.m.alloy, 70);
   const debrisData = Array.from({ length: 70 }, () => ({ r: rr(2.2, 5.2), y: rr(4, 84), a: rr(0, 6.28), w: rr(0.1, 0.5) * (rnd() < 0.5 ? -1 : 1), s: rr(0.12, 0.5), rise: rr(0.2, 1) }));
@@ -467,12 +471,12 @@ export function buildWorld(game: Game, b: Builder): LevelDef {
   // interior: base gallery (no floor to the north — it is a long way down)
   b.box(-11, 11, 18.4, 19, -194, -189, 'alloy'); b.box(-11, -6, 18.4, 19, -206, -194, 'alloy'); b.box(6, 11, 18.4, 19, -206, -194, 'alloy');
   b.railing(-6, -194.1, 6, -194.1, 19, false);
-  for (const y of [23, 31, 39, 47, 55, 63]) for (const [x, z, side] of [[-11, -200, 'x+'], [11, -200, 'x-'], [0, -211, 'z+'], [-6, -189, 'z-'], [6, -189, 'z-']] as const) b.wallLamp(x, y, z, side, 0xb48cff, 2.2, 11);
+  for (const y of [23, 31, 39, 47, 55, 63]) for (const [x, z, side] of [[-11, -200, 'x+'], [11, -200, 'x-'], [0, -211, 'z+'], [-6, -189, 'z-'], [6, -189, 'z-']] as const) b.wallLamp(x, y, z, side, 0xb48cff, 5, 15);
   b.pipeRun([[-10.7, 19, -190], [-10.7, 60, -190]], 0.15, 'copper'); b.pipeRun([[10.7, 19, -210], [10.7, 60, -210]], 0.15, 'copper');
   zones.addCheckpoint('tower', 0, 19, -191.5, 0, 'Tower Base');
   zones.addTrigger('tower', -11, 11, 19.2, 26, -211, -189);
   zones.addKill(-11, 11, -30, 9, -211, -189);
-  b.sign(['STAGE 1', 'DEBRIS IS A STAIRCASE'], -10.95, 21.6, -192, 'x+', 3, 0.9, '#a544ff');
+  b.sign(['STAGE 1', 'STACK WHAT FLOATS'], -10.95, 21.6, -192, 'x+', 3, 0.9, '#a544ff');
 
   // T1: debris stair up to the west gallery
   b.dyn(-8.6, 19.2, -191.6, 2.6, 0.35, 2.6, 'slab', 120);
@@ -562,6 +566,11 @@ export function buildWorld(game: Game, b: Builder): LevelDef {
   let busLevel = 0;
   const frame = (dt: number, t: number) => {
     for (const f of frames) f(dt, t);
+    const pp = game.player.pos;
+    const inHall = pp.z < -113.5 && pp.z > -168 && Math.abs(pp.x) < 20 && pp.y < 18.5;
+    const inTower = pp.z < -189 && pp.z > -211 && Math.abs(pp.x) < 11;
+    const inLab = pp.z > 11.2 && pp.z < 19.5 && Math.abs(pp.x) < 5;
+    stage.indoorTarget = game.state === 'menu' ? 0 : inHall || inTower || inLab ? 1 : 0;
     busLevel += ((socket.filled ? 1 : 0) - busLevel) * Math.min(1, dt * 0.8);
     const flick = busLevel < 0.98 && busLevel > 0.02 ? 0.6 + 0.4 * Math.sin(t * 40) * Math.sin(t * 7) : 1;
     for (const h of hallLights) { h.l.intensity = busLevel * 130 * flick; h.fx.emissiveIntensity = 0.05 + busLevel * 6 * flick; }
@@ -575,6 +584,7 @@ export function buildWorld(game: Game, b: Builder): LevelDef {
     coreOrb.scale.setScalar(1 + done * 0.06 + Math.sin(t * 3) * 0.04 + (game.ended ? 0.5 : 0));
     (coreOrb.material as THREE.MeshStandardMaterial).emissiveIntensity = 1.5 + done * 0.8 + (game.ended ? 5 : 0);
     coreLight.intensity = 30 + done * 14 + (game.ended ? 120 : 0);
+    for (const l of beamLights) l.intensity = 55 + stage.restore * 40 + done * 10 + Math.sin(t * 1.7 + l.position.y) * 6 + (game.ended ? 120 : 0);
     water.material.opacity = 0.9 + Math.sin(t) * 0.03;
     sandbox.frame(dt);
   };
@@ -606,7 +616,7 @@ export function buildWorld(game: Game, b: Builder): LevelDef {
   return {
     objectives: [
       { until: 'zone:courtyard', text: 'Leave the lab.', color: css(Paint.Purple) },
-      { until: 'mass:float', text: 'Paint the suspended test mass.', color: css(Paint.Purple), hint: 'Hold <kbd>LMB</kbd> to spray. PURPLE cancels the weight of whatever it covers.' },
+      { until: 'mass:float', text: 'Climb onto the suspended test mass — then paint it.', color: css(Paint.Purple), hint: 'Hold <kbd>LMB</kbd> to spray. PURPLE cancels the weight of whatever it covers.' },
       { until: 'zone:balcony', text: 'Ride the weightless mass up to the walkway.', color: css(Paint.Purple), hint: 'Stand on it and keep painting — more purple, more lift. <kbd>Q</kbd> SOLVENT strips paint.' },
       { until: 'pickup:yellow', text: 'Take the YELLOW pigment.', color: css(Paint.Yellow) },
       { until: 'zone:pumproof', text: 'Reach the pump-house roof across the breach.', color: css(Paint.Yellow), hint: '<kbd>4</kbd> YELLOW turns a surface into a spring. Paint the roof below, then drop onto it. Hold <kbd>Space</kbd> to bounce higher.' },
@@ -620,7 +630,7 @@ export function buildWorld(game: Game, b: Builder): LevelDef {
       { until: 'power:elevator', text: 'Cross the stampers and energise the freight lift.', color: css(Paint.Red) },
       { until: 'zone:roof', text: 'Ride the lift to the roof.', color: '#ffffff' },
       { until: 'zone:tower', text: 'Cross the bridge into the Gravity Tower.', color: css(Paint.Purple) },
-      { until: 'zone:w1', text: 'Climb to the west gallery.', color: css(Paint.Purple), hint: 'Each slab hovers higher the more purple it wears. Build a staircase.' },
+      { until: 'zone:w1', text: 'Climb to the west gallery.', color: css(Paint.Purple), hint: 'A painted slab hovers above whatever is beneath it — including another slab. One alone will not reach.' },
       { until: 'zone:n1', text: 'Cross the void to the north gallery.', color: css(Paint.Red), hint: 'Float the rider plate, stand on it, then energise the mag-rail.' },
       { until: 'zone:n2', text: 'Scale the moss buttress.', color: css(Paint.Green) },
       { until: 'zone:e1', text: 'Reach the east gallery, high above.', color: css(Paint.Yellow), hint: 'A stalk will not reach on its own. Its cap takes paint like anything else.' },

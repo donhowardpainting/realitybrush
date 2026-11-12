@@ -1,4 +1,5 @@
 import type { Game } from '../game';
+import * as THREE from 'three';
 import { Paint, PAINTS, PAINT_ORDER } from '../paint/types';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -19,6 +20,9 @@ export class Hud {
   private titleTimer = 0;
   private lastObjective = '';
   private tags = '';
+  private aim = '';
+  private aimT = 0;
+  private dir = new THREE.Vector3();
 
   constructor(private game: Game) {
     const bar = $('hotbar');
@@ -103,6 +107,34 @@ export class Hud {
     $('crosshair').classList.toggle('fire', this.game.input.down('Mouse0'));
     const tags = [pl.climbing ? 'CLIMBING' : '', pl.onIce ? 'NO FRICTION' : '', pl.lowG && !pl.grounded ? 'LOW GRAVITY' : ''].filter(Boolean).join(' · ');
     if (tags !== this.tags) { this.tags = tags; $('state-tags').textContent = tags; }
+    if ((this.aimT -= dt) <= 0) {
+      this.aimT = 0.12;
+      const aim = this.game.state === 'playing' ? this.describeAim() : '';
+      if (aim !== this.aim) { this.aim = aim; $('aim-tag').textContent = aim; }
+    }
+  }
+
+  /** One-line readout of whatever is under the crosshair: makes the rules discoverable. */
+  private describeAim(): string {
+    const g = this.game, e = g.player.eye, d = g.player.forward(this.dir);
+    const h = g.physics.castRay(e.x, e.y, e.z, d.x, d.y, d.z, 45);
+    const p = h ? g.paint.get(h.collider) : undefined;
+    if (!p) return '';
+    const r = g.power.receptors.find((x) => x.p === p);
+    if (r) {
+      const name = r.label || `${PAINTS[r.need].key.toUpperCase()} LOCK`;
+      return r.on ? `${name} · ENERGISED` : `${name} · ${Math.min(99, Math.round((r.coverage / 0.35) * 100))}%`;
+    }
+    if (p.tags.has('cap')) return `STALK · ${(p.data.stalk.height as number).toFixed(1)} M`;
+    if (p.dynamic) {
+      const dyn = g.dynamics.byPaintable.get(p);
+      if (!dyn || dyn.captured) return '';
+      return `${Math.round(p.body.mass())} KG` + (dyn.lift > 0 ? ` · LIFT ${Math.round(dyn.lift * 100)}%` : '') + (dyn.icy ? ' · FRICTIONLESS' : '') + (dyn.cY > 0.05 ? ' · ELASTIC' : '');
+    }
+    if (p.fertile === 'vine') return 'FERTILE MOSS';
+    if (p.fertile === 'stalk') return 'FERTILE SOIL';
+    if (p.resist) return 'PAINT-RESISTANT';
+    return '';
   }
 
   /* ---------------------------------------------------------------- menus */

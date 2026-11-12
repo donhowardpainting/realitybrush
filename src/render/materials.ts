@@ -216,11 +216,12 @@ export class Materials {
     mk('alloy', build(S, (u, v) => {
       const seam = Math.min(gridLine(u, 2), gridLine(v, 4));
       const sm = sstep(0.004, 0.012, seam);
-      const n = fbm(u, v, 6, 4, 101), brush = fbm(u * 20, v * 0.5, 4, 2, 102);
-      const circuit = (1 - sstep(0.0, 0.006, Math.abs(gridLine(u, 8) - 0.02))) * (fbm(u, v, 4, 2, 103) > 0.55 ? 1 : 0);
-      const c = (0.16 + n * 0.08 + brush * 0.04) * lerp(0.4, 1, sm);
-      return { r: c * 0.92, g: c * 0.95, b: c * 1.25, h: sm * 0.6 + brush * 0.1, rough: 0.38 + n * 0.2, metal: 0.85, e: circuit * 0.9 + (1 - sm) * 0.25 };
-    }, 2.5, true), { metalness: 1, emissive: 0x8a6cff, emissiveIntensity: 0.55 });
+      const n = fbm(u, v, 5, 4, 101), fine = fbm(u, v, 36, 2, 102);
+      const plate = hash2(Math.floor(u * 2), Math.floor(v * 4), 104);
+      const node = (1 - sstep(0.02, 0.035, Math.hypot(((u * 2) % 1) - 0.5, ((v * 4) % 1) - 0.5) * 0.5)) * (plate > 0.72 ? 1 : 0);
+      const c = (0.15 + n * 0.07 + fine * 0.03 + (plate - 0.5) * 0.05) * lerp(0.45, 1, sm);
+      return { r: c * 0.93, g: c * 0.96, b: c * 1.22, h: sm * 0.6 + fine * 0.08, rough: 0.4 + n * 0.22, metal: 0.8, e: node };
+    }, 2.5, true), { metalness: 1, emissive: 0x8a6cff, emissiveIntensity: 1.2 });
 
     mk('crate', build(S, (u, v) => {
       const edge = Math.min(u, 1 - u, v, 1 - v);

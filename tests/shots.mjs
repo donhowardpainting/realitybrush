@@ -24,14 +24,15 @@ const extra = process.argv[3] ? readFileSync(process.argv[3], 'utf8') : '';
 const srv = await serve();
 const { browser, page, errors } = await open(srv.url, process.argv[4] ?? 'test=1&quality=high&bake=1', { width: 1280, height: 720 });
 try {
-  await page.evaluate(`(async () => { const g = window.__rb; g.start('new'); g.simulate(0.5); ${extra} })()`);
+  await page.evaluate(`(async () => { const g = window.__rb; g.start('new'); g.simulate(0.5); for (const p of [2, 3, 4, 5]) g.zones.removePickup(p); ${extra} })()`);
+  await page.waitForTimeout(4000);
   for (const n of names) {
     const v = VIEWS[n];
     await page.evaluate(([x, y, z, yaw, pitch]) => {
       const g = window.__rb, V = g.player.pos.constructor;
-      g.player.teleport(new V(x, y, z), yaw); g.player.pitch = pitch; g.player.frozen = true; g.stage.fade = 0; g.stage.fadeTarget = 0;
+      g.player.teleport(new V(x, y, z), yaw); g.player.pitch = pitch; g.player.frozen = true; g.stage.fade = 0; g.stage.fadeTarget = 0; g.stage.barsTarget = 0; document.getElementById('title-card').classList.remove('show'); document.getElementById('hint').classList.remove('show');
     }, v);
-    await page.waitForTimeout(2500);
+    await page.waitForTimeout(4500);
     await page.screenshot({ path: `tests/out/${n}.png`, timeout: 300000 });
     console.log('shot', n);
   }

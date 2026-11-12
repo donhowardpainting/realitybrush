@@ -5,11 +5,15 @@ export { RAPIER };
 
 export const GROUP_WORLD = 0x0001;
 export const GROUP_PLAYER = 0x0002;
+/** Glass: solid for gameplay, transparent to the lighting bake. */
+export const GROUP_GLASS = 0x0008;
 export const groups = (member: number, filter: number) => ((member << 16) | filter) >>> 0;
 /** Collision groups of every world collider. */
 export const WORLD_GROUPS = groups(GROUP_WORLD, 0xffff);
 /** Query filter that only sees world colliders (never the player capsule). */
-export const QUERY_WORLD = groups(0xffff, GROUP_WORLD);
+export const QUERY_WORLD = groups(0xffff, GROUP_WORLD | GROUP_GLASS);
+/** Query filter for light rays: glass does not occlude. */
+export const QUERY_OPAQUE = groups(0xffff, GROUP_WORLD);
 
 export const WORLD_GRAVITY = 18;
 
@@ -96,8 +100,8 @@ export class Physics {
   }
 
   /** Static scenery collider (not paintable). */
-  sceneryBox(cx: number, cy: number, cz: number, hx: number, hy: number, hz: number, q?: THREE.Quaternion) {
-    const d = RAPIER.ColliderDesc.cuboid(hx, hy, hz).setTranslation(cx, cy, cz).setCollisionGroups(WORLD_GROUPS).setFriction(0);
+  sceneryBox(cx: number, cy: number, cz: number, hx: number, hy: number, hz: number, q?: THREE.Quaternion, glass = false) {
+    const d = RAPIER.ColliderDesc.cuboid(hx, hy, hz).setTranslation(cx, cy, cz).setCollisionGroups(glass ? groups(GROUP_GLASS, 0xffff) : WORLD_GROUPS).setFriction(0);
     if (q) d.setRotation(q);
     return this.world.createCollider(d, this.scenery);
   }

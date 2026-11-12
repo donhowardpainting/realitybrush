@@ -108,6 +108,9 @@ export class Stage {
   barsTarget = 0;
   speedFx = 0;
   skyPulse = 0;
+  /** 0 outdoors, 1 deep inside a building: thins and darkens the fog. */
+  indoor = 0;
+  indoorTarget = 0;
   quality: Quality;
   private fog: THREE.FogExp2;
 
@@ -172,7 +175,7 @@ export class Stage {
       const rt = new THREE.WebGLRenderTarget(size.x, size.y, { type: THREE.HalfFloatType, samples: 4 });
       this.composer = new EffectComposer(this.renderer, rt);
       this.composer.addPass(new RenderPass(this.scene, this.camera));
-      this.bloom = new UnrealBloomPass(new THREE.Vector2(size.x / 2, size.y / 2), 0.55, 0.75, 0.82);
+      this.bloom = new UnrealBloomPass(new THREE.Vector2(size.x / 2, size.y / 2), 0.4, 0.6, 0.9);
       this.composer.addPass(this.bloom);
       this.composer.addPass(new OutputPass());
       this.grade = new ShaderPass({
@@ -271,8 +274,10 @@ export class Stage {
     (this.dust.material as THREE.ShaderMaterial).uniforms.uCam.value.copy(camPos);
     (this.dust.material as THREE.ShaderMaterial).uniforms.uScale.value = this.renderer.getPixelRatio() * (window.innerHeight / 900);
     (this.dust.material as THREE.ShaderMaterial).uniforms.uColor.value.setRGB(1, 0.92 - r * 0.1, 0.78 - r * 0.25);
-    this.fog.color.setRGB(0.3 + r * 0.42, 0.34 + r * 0.14, 0.33 + r * 0.02);
-    this.fog.density = 0.0115 - r * 0.0045;
+    this.indoor += (this.indoorTarget - this.indoor) * (1 - Math.exp(-dt * 1.6));
+    const fk = 1 - this.indoor * 0.72;
+    this.fog.color.setRGB((0.3 + r * 0.42) * fk, (0.34 + r * 0.14) * fk, (0.33 + r * 0.02) * fk);
+    this.fog.density = (0.0115 - r * 0.0045) * (1 - this.indoor * 0.45);
     this.sun.color.setRGB(0.85 + r * 0.15, 0.89 - r * 0.1, 0.88 - r * 0.33);
     this.sun.intensity = 1.5 + r * 2.0;
     this.hemi.intensity = 0.75 + r * 0.45;
@@ -290,7 +295,7 @@ export class Stage {
       const u = this.grade.uniforms;
       u.uRestore.value = r; u.uFade.value = this.fade; u.uFlash.value = this.flash; u.uSpeed.value = this.speedFx; u.uBars.value = this.bars;
     }
-    if (this.bloom) this.bloom.strength = 0.5 + r * 0.25;
+    if (this.bloom) this.bloom.strength = 0.38 + r * 0.2;
   }
 
   render() {

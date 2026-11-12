@@ -62,8 +62,6 @@ export class Zones {
       new THREE.MeshBasicMaterial({ color: info.hex, transparent: true, opacity: 0.12, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }),
     );
     g.add(halo);
-    const light = new THREE.PointLight(info.hex, 6, 9, 2);
-    g.add(light);
     g.position.set(x, y + 1.25, z);
     this.game.stage.scene.add(g);
     this.pickups.push({ paint, pos: new THREE.Vector3(x, y + 1.25, z), group: g, taken: false, halo });
@@ -94,6 +92,11 @@ export class Zones {
     const game = this.game, p = game.player.pos, t = game.time;
     const fy = game.player.feetY;
     for (const cp of this.checkpoints) {
+      // the beam is a marker to walk toward: fade it out as you arrive so it never veils the view
+      const d = Math.hypot(p.x - cp.pos.x, p.z - cp.pos.z);
+      const near = Math.min(1, Math.max(0, (d - 2.5) / 4));
+      (cp.beam.material as THREE.ShaderMaterial).uniforms.uA.value = (cp === this.current ? 0.3 : 0.05) * near;
+      cp.beam.visible = near > 0.01 && d < 90;
       if (cp !== this.current && Math.hypot(p.x - cp.pos.x, p.z - cp.pos.z) < 2.2 && Math.abs(fy - cp.pos.y) < 2.2) this.activate(cp);
     }
     for (const tr of this.triggers) {

@@ -77,6 +77,15 @@ ${paint ? `{
 roughnessFactor = mix(roughnessFactor, 0.16, gPaintM);`)
       .replace('#include <metalnessmap_fragment>', `#include <metalnessmap_fragment>
 metalnessFactor = mix(metalnessFactor, 0.0, gPaintM);`)
+      .replace('#include <aomap_fragment>', `#include <aomap_fragment>
+// baked occlusion also hides the sky from reflections, so interiors do not mirror daylight
+#ifdef USE_COLOR
+  float rbOcc = clamp(dot(vColor.rgb, vec3(0.45)), 0.0, 1.0);
+  reflectedLight.indirectSpecular *= mix(rbOcc, 1.0, gPaintM * 0.6);
+  #ifdef USE_CLEARCOAT
+    clearcoatSpecularIndirect *= rbOcc;
+  #endif
+#endif`)
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
 totalEmissiveRadiance += diffuseColor.rgb * vBaked;
 totalEmissiveRadiance += gPaintC * gPaintM * (0.2 + 0.1 * sin(uTime * 2.2 + rbNoise(vPLocal * 1.3) * 12.0));`);
@@ -174,7 +183,7 @@ export class Paintable {
     this.collider = physics.world.createCollider(cd, this.body);
 
     const maxDim = Math.max(o.half.x, o.half.y, o.half.z) * 2;
-    this.N = Math.max(12, Math.min(176, Math.round(maxDim * 7)));
+    this.N = Math.max(12, Math.min(224, Math.round(maxDim * 9)));
     const [hx, hy, hz] = this.halfArr;
     const ax = 4 * hy * hz, ay = 4 * hx * hz, az = 4 * hx * hy;
     this.faceArea = [ax, ax, ay, ay, az, az];

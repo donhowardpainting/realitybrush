@@ -115,6 +115,56 @@ const tests = {
     return { playerApexPlain: r2(plain), playerApexYellow: r2(bouncy), crateApex: r2(cmax) };
   },
 
+  async yellow_carries_the_player_across_the_breach() {
+    g.start('new'); g.simulate(0.3);
+    at(0, 8, -35.5, 0); hold('KeyW', 4);
+    check(!g.seen.has('zone:pumproof') && g.player.feetY < 3.5, 'without yellow the pump house is out of reach');
+    area(-4.5, 4.5, -49, -41, 3, P.yellow, 0.55);
+    at(0, 8, -35.5, 0);
+    g.input.press('KeyW');
+    for (let i = 0; i < 600 && !g.seen.has('zone:pumproof'); i++) g.simulate(1 / 60);
+    g.input.release('KeyW');
+    check(g.seen.has('zone:pumproof'), 'dropping onto the yellow roof should bounce the player onto the pump house, at ' + g.player.pos.toArray().map(r2));
+    return { bounces: g.player.stats.bounces };
+  },
+
+  async floating_objects_stack() {
+    g.start('sandbox'); g.simulate(0.5);
+    const slabs = g.dynamics.bodies.filter((d) => d.p.tags.has('slab') && d.home.x > 250 && d.p.body.mass() < 200);
+    const [a, b] = slabs;
+    a.p.fill(P.purple); g.simulate(6);
+    const ya = a.p.body.translation().y;
+    const ta = a.p.body.translation();
+    b.p.body.setTranslation({ x: ta.x, y: ta.y + 1, z: ta.z }, true); b.p.body.setRotation({ x: 0, y: 0, z: 0, w: 1 }, true);
+    b.p.fill(P.purple); g.simulate(7);
+    const yb = b.p.body.translation().y;
+    check(ya > 6, 'first slab hovers ~6.5 m up, y=' + ya);
+    check(yb > ya + 5.5, 'second slab hovers above the first (stacked lift), y=' + yb);
+    at(ta.x, yb + 0.3, ta.z); g.simulate(0.5);
+    check(g.player.grounded && g.player.feetY > 12, 'player can stand on the stack, feet ' + g.player.feetY);
+    return { first: r2(ya), second: r2(yb) };
+  },
+
+  async tower_stalk_plus_bounce_reaches_the_east_gallery() {
+    g.start('new'); g.simulate(0.3);
+    splat(8, 36.2, -209.4, P.green); g.simulate(0.2);
+    const st = g.growth.stalks[0];
+    check(!!st, 'stalk sprouts on the tower seed bed');
+    for (let i = 0; i < 14; i++) splat(8, 36.2, -209.4 + (i % 2) * 0.2, P.green);
+    g.simulate(5);
+    check(st.height > 6.2, 'fed stalk reaches full height, ' + st.height);
+    at(st.base.x, st.base.y + st.height + 0.05, st.base.z + 0.5, Math.PI); g.simulate(0.4);
+    hold('Space', 0.05); g.simulate(1.2);
+    check(!g.seen.has('zone:e1'), 'a plain jump from the cap must not reach the gallery');
+    at(st.base.x, st.base.y + st.height + 0.05, st.base.z + 0.5, Math.PI); g.simulate(0.3);
+    st.cap.fill(P.yellow);
+    g.input.press('KeyW');
+    for (let i = 0; i < 300 && !g.seen.has('zone:e1'); i++) g.simulate(1 / 60);
+    g.input.release('KeyW');
+    check(g.seen.has('zone:e1'), 'bouncing off the yellow cap should reach the east gallery, at ' + g.player.pos.toArray().map(r2));
+    return { stalk: r2(st.height) };
+  },
+
   async blue_ice_builds_momentum_to_clear_the_canal() {
     g.start('new'); g.simulate(0.3);
     const run = (ice) => {
@@ -347,16 +397,32 @@ async function saveRestore(page, url) {
   if (!saved || saved.cp !== 'hall') throw new Error('save should record the hall checkpoint: ' + JSON.stringify(saved));
   await page.reload();
   await page.waitForFunction(() => window.__rb && window.__rb.state === 'menu', null, { timeout: 180000 });
-  return page.evaluate(`(async () => { ${HELPERS}
+  const res = await page.evaluate(`(async () => { ${HELPERS}
     check(g.hasSave(), 'save present after reload');
     g.start('continue'); g.simulate(3);
     check(Math.abs(g.player.pos.z + 117) < 1.5, 'continue should spawn at the saved checkpoint, z=' + g.player.pos.z);
     check([P.purple, P.yellow, P.blue, P.red].every((p) => g.unlocked.has(p)) && !g.unlocked.has(P.green), 'pigments restored');
     check(g.power.receptor('door').on && g.power.movers[0].t > 0.9, 'blast door state restored');
     check(g.currentObjective().includes('core'), 'objective restored: ' + g.currentObjective());
-    localStorage.clear();
     return { summary: 'ok' };
   })()`);
+  // restarting: "New Game" over an existing save wipes it and boots a fresh world
+  await Promise.all([
+    page.waitForNavigation({ timeout: 60000 }),
+    page.evaluate(() => { setTimeout(() => window.__rb.start('new'), 30); }),
+  ]);
+  await page.waitForFunction(() => window.__rb && window.__rb.state === 'menu', null, { timeout: 180000 });
+  const fresh = await page.evaluate(`(async () => { ${HELPERS}
+    check(!g.hasSave(), 'restart must erase the save');
+    check(g.seen.size === 0 && !g.power.receptor('door').on, 'restart must reset the world');
+    document.querySelector('#menu button').click();
+    g.simulate(0.5);
+    check(g.state === 'playing' && Math.abs(g.player.pos.z - 17) < 1, 'restart begins in the lab, z=' + g.player.pos.z);
+    check(g.unlocked.size === 1 && g.unlocked.has(P.purple), 'restart leaves only the first pigment');
+    localStorage.clear();
+    return 'restart ok';
+  })()`);
+  return { continue: res.summary, restart: fresh };
 }
 
 const filter = process.argv[2];

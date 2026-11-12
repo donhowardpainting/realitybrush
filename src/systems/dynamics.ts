@@ -156,7 +156,7 @@ export class Dynamics {
           want = Math.max(-2.6, Math.min(2.6, (target - clearance) * 2));
         }
         want += Math.sin(time * 1.3 + d.phase) * 0.07;
-        const k = Math.min(1, 5 * dt);
+        const k = Math.min(1, 12 * dt); // stiff enough to carry a load heavier than itself
         b.setLinvel({ x: v.x, y: v.y + (want - v.y) * k, z: v.z }, true);
         // anti-gravity shimmer shedding from the underside
         if (Math.random() < 0.25 && Math.abs(t.x - game.player.pos.x) + Math.abs(t.z - game.player.pos.z) < 45) {

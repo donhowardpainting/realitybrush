@@ -6,7 +6,7 @@ import type { Paintable } from '../paint/paintable';
 
 const HALF_H = 0.5, RADIUS = 0.35, FEET = HALF_H + RADIUS, EYE = 0.68;
 const GRAVITY = 24, JUMP = 8.1, WALK = 6.2, SPRINT = 9.2;
-const BOUNCE_MIN = 13, BOUNCE_MAX = 22;
+const BOUNCE_MIN = 14, BOUNCE_MAX = 22;
 const PUSH_FORCE = 1100;
 
 interface Ground { collider: RAPIER.Collider; toi: number; point: THREE.Vector3; normal: THREE.Vector3; paintable?: Paintable; paint: Paint }
@@ -173,7 +173,9 @@ export class Player {
     let jumped = false;
     if (wasGrounded) {
       const sp = Math.hypot(v.x, v.z);
-      const fr = this.onIce ? 0.1 : 9;
+      // above sprint speed you are skidding, not running: momentum bleeds off far more slowly,
+      // so a small gap in an ice trail does not throw away the whole run-up
+      const fr = this.onIce ? 0.1 : sp > SPRINT + 0.5 ? 2.2 : 9;
       if (sp > 0) { const drop = Math.max(sp, this.onIce ? 0 : 2.5) * fr * dt; const k = Math.max(0, sp - drop) / sp; v.x *= k; v.z *= k; }
       this.accelerate(wx, wz, maxSp, this.onIce ? 1.1 : 11, dt);
       if (this.onIce) { const n = this.gNormal; v.x += GRAVITY * n.x * n.y * dt; v.z += GRAVITY * n.z * n.y * dt; }

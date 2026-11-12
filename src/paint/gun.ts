@@ -70,7 +70,7 @@ export class Gun {
     add(new THREE.BoxGeometry(0.085, 0.1, 0.3), body, 0, 0, 0.02);
     add(new THREE.BoxGeometry(0.09, 0.018, 0.24), trim, 0, 0.056, 0.03);
     add(new THREE.BoxGeometry(0.092, 0.03, 0.1), trim, 0, -0.02, -0.07);
-    add(new THREE.BoxGeometry(0.06, 0.15, 0.065), dark, 0, -0.115, 0.115, 0.32);
+    add(new THREE.BoxGeometry(0.05, 0.13, 0.055), dark, 0, -0.105, 0.125, 0.4);
     add(new THREE.TorusGeometry(0.032, 0.006, 6, 14, Math.PI), dark, 0, -0.055, 0.035, 0, H, Math.PI);
     add(new THREE.BoxGeometry(0.004, 0.012, 0.2), tint(0.9), 0.0435, 0.02, 0.02);
     add(new THREE.BoxGeometry(0.004, 0.012, 0.2), tint(0.9), -0.0435, 0.02, 0.02);
@@ -90,10 +90,10 @@ export class Gun {
     add(new THREE.TorusGeometry(0.045, 0.006, 6, 14, Math.PI), steel, 0, 0.06, -0.075, H, 0, H);
     this.muzzle.position.set(0, 0.005, -0.47);
     this.model.add(this.muzzle);
-    this.model.scale.setScalar(0.55);
+    this.model.scale.setScalar(0.4);
     this.model.traverse((o) => { o.frustumCulled = false; });
-    this.root.position.set(0.15, -0.135, -0.27);
-    this.root.rotation.set(0.02, 0.06, 0);
+    this.root.position.set(0.135, -0.125, -0.25);
+    this.root.rotation.set(0.03, 0.09, 0);
   }
 
   select(p: Paint, silent = false) {
@@ -251,7 +251,15 @@ export class Gun {
     if (Math.random() < 0.5) game.audio.splat(g.type, vol);
     if (stuck) {
       game.drops.burst(pt, nm, c, 7, 4.5, 0.06, 0.5, 12);
-      game.glow.burst(pt, nm, c, 5, 2.5, 0.07, 0.35, 2, 1.5);
+      // each pigment lands with its own character
+      switch (g.type) {
+        case Paint.Purple: game.glow.burst(pt, nm, c, 6, 1.6, 0.07, 0.9, -2.2, 1.6); break;             // motes that fall upward
+        case Paint.Blue: game.glow.burst(pt, nm, _col.setRGB(0.75, 0.95, 1), 8, 5, 0.04, 0.3, 6, 2); break; // frost shards
+        case Paint.Green: game.glow.burst(pt, nm, c, 5, 2, 0.06, 0.7, 1.5, 1.3); break;                    // drifting spores
+        case Paint.Yellow: game.glow.burst(pt, nm, c, 7, 6.5, 0.05, 0.5, 14, 1.8); break;                  // hopping beads
+        case Paint.Red: game.glow.burst(pt, nm, _col.setRGB(1, 0.6, 0.3), 10, 9, 0.035, 0.22, 4, 3); break; // sparks
+        default: game.glow.burst(pt, nm, _col.setRGB(0.9, 0.95, 1), 6, 2, 0.08, 0.5, -0.5, 0.6);           // solvent vapour
+      }
       // drips on walls
       if (Math.abs(nm.y) < 0.4 && Math.random() < 0.5) game.drops.spawn(pt.x + nm.x * 0.03, pt.y, pt.z + nm.z * 0.03, 0, -0.4, 0, c.r, c.g, c.b, 0.05, 1.2, 3, 0.5, 1);
     } else {

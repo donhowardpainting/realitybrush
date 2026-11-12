@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { Game } from '../game';
-import { RAPIER, QUERY_WORLD } from '../core/physics';
+import { RAPIER, QUERY_OPAQUE } from '../core/physics';
 import { injectWorldShader, Paintable } from '../paint/paintable';
 import { Paint, PAINTS } from '../paint/types';
 import { MatName, textTexture } from '../render/materials';
@@ -110,7 +110,7 @@ export class Builder {
     if (rot) { _q.setFromEuler(_e.set(rot[0], rot[1], rot[2])); g.applyMatrix4(_m.compose(V(cx, cy, cz), _q, V(1, 1, 1))); }
     else g.translate(cx, cy, cz);
     this.deco(g, mat);
-    if (collide) this.game.physics.sceneryBox(cx, cy, cz, w / 2, h / 2, d / 2, rot ? _q.clone() : undefined);
+    if (collide) this.game.physics.sceneryBox(cx, cy, cz, w / 2, h / 2, d / 2, rot ? _q.clone() : undefined, mat === 'glass');
   }
 
   /** Cylinder between two points. */
@@ -148,7 +148,7 @@ export class Builder {
     if (bulb > 0) {
       const g = new THREE.SphereGeometry(bulb, 10, 8);
       g.translate(x, y, z);
-      this.deco(g, this.glowKey(hex, 5));
+      this.deco(g, this.glowKey(hex, 3));
     }
   }
 
@@ -457,7 +457,7 @@ export class Builder {
     const flags = RAPIER.QueryFilterFlags.EXCLUDE_SENSORS | RAPIER.QueryFilterFlags.EXCLUDE_DYNAMIC | RAPIER.QueryFilterFlags.EXCLUDE_KINEMATIC;
     const cast = (ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, max: number) => {
       ray.origin.x = ox; ray.origin.y = oy; ray.origin.z = oz; ray.dir.x = dx; ray.dir.y = dy; ray.dir.z = dz;
-      const h = world.castRay(ray, max, true, flags, QUERY_WORLD);
+      const h = world.castRay(ray, max, true, flags, QUERY_OPAQUE);
       return h ? h.timeOfImpact : -1;
     };
     const p = new THREE.Vector3(), n = new THREE.Vector3(), t1 = new THREE.Vector3(), t2 = new THREE.Vector3(), d = new THREE.Vector3();
@@ -481,11 +481,14 @@ export class Builder {
         if (h >= 0) occ += 1 - h / AO_R;
       }
       const ao = 1 - (occ / 4) * 0.85;
-      // sky visibility: straight up and toward the sun
+      // sky visibility: a small cone of rays, so skylights and doorways spill soft daylight indoors
       let sky = 0;
-      if (cast(ox, oy, oz, 0, 1, 0, 90) < 0) sky += 0.5;
-      if (cast(ox, oy, oz, sun.x * 0.6, 0.8, sun.z * 0.6, 90) < 0) sky += 0.5;
-      const f = ao * (0.2 + 0.8 * sky);
+      if (cast(ox, oy, oz, 0, 1, 0, 90) < 0) sky += 0.3;
+      if (cast(ox, oy, oz, sun.x * 0.6, 0.8, sun.z * 0.6, 90) < 0) sky += 0.25;
+      if (cast(ox, oy, oz, 0.45, 0.89, 0.1, 90) < 0) sky += 0.15;
+      if (cast(ox, oy, oz, -0.3, 0.89, 0.35, 90) < 0) sky += 0.15;
+      if (cast(ox, oy, oz, -0.15, 0.89, -0.43, 90) < 0) sky += 0.15;
+      const f = ao * (0.34 + 0.66 * sky);
       col.setXYZ(i, col.getX(i) * f, col.getY(i) * f, col.getZ(i) * f);
       let lr = 0, lg = 0, lb = 0;
       for (const l of lamps) {

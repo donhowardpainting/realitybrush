@@ -43,7 +43,8 @@ canvas#c { position: fixed; inset: 0; width: 100%; height: 100%; display: block;
 #title-card.show { opacity: 1; }
 #title-card h2 { margin: 0; padding-left: .22em; font-size: clamp(26px, 3.6vw, 54px); letter-spacing: .22em; font-weight: 300; white-space: nowrap; }
 #title-card p { margin: 10px 0 0; font-size: 15px; letter-spacing: .4em; color: var(--dim); }
-#state-tags { position: absolute; left: 50%; top: calc(50% + 34px); transform: translateX(-50%); font-size: 11px; letter-spacing: .25em; color: var(--dim); text-shadow: 0 1px 4px #000; white-space: nowrap; }
+#aim-tag { position: absolute; left: 50%; top: calc(50% + 30px); transform: translateX(-50%); font-size: 11px; letter-spacing: .22em; color: var(--ink); opacity: .8; text-shadow: 0 1px 4px #000; white-space: nowrap; }
+#state-tags { position: absolute; left: 50%; top: calc(50% + 50px); transform: translateX(-50%); font-size: 11px; letter-spacing: .25em; color: var(--dim); text-shadow: 0 1px 4px #000; white-space: nowrap; }
 
 .logo { margin: 0; font-size: clamp(40px, 8vw, 104px); font-weight: 800; letter-spacing: .12em; line-height: 1; }
 .logo span { background: linear-gradient(90deg, var(--purple), var(--blue), var(--green), var(--yellow), var(--red)); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 0 22px rgba(165,68,255,.45)); }
