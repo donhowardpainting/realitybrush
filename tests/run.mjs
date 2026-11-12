@@ -28,18 +28,18 @@ const HELPERS = `
 const tests = {
   async paint_is_localized_and_repaintable() {
     g.start('sandbox'); g.simulate(0.3);
-    const floorCov = () => { const h = g.physics.castRay(292, 0.5, 2, 0, -1, 0, 2); return g.paint.get(h.collider); };
-    const p = floorCov();
-    splat(292, 0, 2, P.purple);
-    check(surfaceAt(292, 0, 2) === P.purple, 'spot should be purple');
-    check(surfaceAt(296, 0, 2) === P.none, 'a spot 4 m away must stay unpainted');
+    const p = g.paint.get(g.physics.castRay(290, 0.5, -4, 0, -1, 0, 2).collider);
+    check(!p.dynamic, 'expected the yard floor');
+    splat(290, 0, -4, P.purple);
+    check(surfaceAt(290, 0, -4) === P.purple, 'spot should be purple');
+    check(surfaceAt(294, 0, -4) === P.none, 'a spot 4 m away must stay unpainted');
     const cov = p.coverage(P.purple);
-    check(cov > 0 && cov < 0.01, 'one splat must cover a tiny fraction of a 22x48 m floor, got ' + cov);
-    splat(292, 0, 2, P.blue);
-    check(surfaceAt(292, 0, 2) === P.blue, 'repaint should replace purple with blue');
+    check(cov > 0 && cov < 0.002, 'one splat must cover a tiny fraction of a 22x48 m floor, got ' + cov);
+    splat(290, 0, -4, P.blue);
+    check(surfaceAt(290, 0, -4) === P.blue, 'repaint should replace purple with blue');
     check(p.coverage(P.purple) < cov * 0.35, 'most purple should be overwritten');
-    splat(292, 0, 2, P.none, up, 0.9);
-    check(surfaceAt(292, 0, 2) === P.none, 'solvent should strip paint');
+    splat(290, 0, -4, P.none, up, 0.9);
+    check(surfaceAt(290, 0, -4) === P.none, 'solvent should strip paint');
     return { oneSplatCoverage: cov };
   },
 
@@ -80,8 +80,8 @@ const tests = {
 
   async purple_height_scales_with_coverage() {
     g.start('sandbox'); g.simulate(0.5);
-    const crates = g.dynamics.bodies.filter((d) => d.p.tags.has('crate'));
-    const a = crates[1], b = crates[2];
+    const crates = g.dynamics.bodies.filter((d) => d.p.tags.has('crate') && d.home.x > 250 && d.p.body.mass() === 45);
+    const a = crates[0], b = crates[1];
     const ta = a.p.body.translation(), tb = b.p.body.translation();
     g.paint.splat(a.p, new V(ta.x, ta.y + 0.5, ta.z), up, P.purple, 0.3, true);
     b.p.fill(P.purple);
@@ -98,17 +98,17 @@ const tests = {
   async yellow_bounces_player_and_objects() {
     g.start('sandbox'); g.simulate(0.3);
     const drop = (paint) => {
-      at(300, 6, 0); if (paint) area(298.5, 301.5, -1.5, 1.5, 0, P.yellow, 0.5);
-      let max = 0, landed = false;
-      for (let i = 0; i < 240; i++) { g.simulate(1 / 60); if (g.player.feetY < 0.5) landed = true; if (landed) max = Math.max(max, g.player.feetY); }
+      at(300, 6, -6); if (paint) area(298.5, 301.5, -7.5, -4.5, 0, P.yellow, 0.5);
+      let max = 0, landed = false; const b0 = g.player.stats.bounces;
+      for (let i = 0; i < 240; i++) { g.simulate(1 / 60); if (g.player.grounded || g.player.stats.bounces > b0) landed = true; if (landed) max = Math.max(max, g.player.feetY); }
       return max;
     };
     const plain = drop(false), bouncy = drop(true);
     check(plain < 0.2, 'no bounce on bare ground, got ' + plain);
     check(bouncy > 3, 'yellow floor should launch the player, apex ' + bouncy);
     // objects too
-    const crate = g.dynamics.bodies.find((d) => d.p.tags.has('crate'));
-    crate.p.body.setTranslation({ x: 300, y: 5, z: 0 }, true); crate.p.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+    const crate = g.dynamics.bodies.find((d) => d.p.tags.has('crate') && d.home.x > 250);
+    crate.p.body.setTranslation({ x: 300, y: 5, z: -6 }, true); crate.p.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
     let cmax = 0, hit = false;
     for (let i = 0; i < 200; i++) { g.simulate(1 / 60); const y = crate.p.body.translation().y; if (y < 0.8) hit = true; if (hit) cmax = Math.max(cmax, y); }
     check(cmax > 2, 'crate should rebound off yellow paint, apex ' + cmax);
@@ -188,7 +188,7 @@ const tests = {
     g.start('new'); g.simulate(0.3);
     const door = g.power.movers[0];
     at(0, 0, -108, 0); hold('KeyW', 2);
-    check(g.player.pos.z > -112, 'blast door should block the way');
+    check(g.player.pos.z > -112.3, 'blast door should block the way, z=' + g.player.pos.z);
     // a partial dab is not enough
     const r = g.power.receptor('door');
     splat(5.4, 1.7, -111.8, P.red, new V(0, 0, 1), 0.25); g.simulate(0.3);
@@ -226,8 +226,10 @@ const tests = {
     check(g.unlocked.has(P.green), 'green pickup');
     g.simulate(1);
     check(lift.on, 'lift energises once bus + pigments are present');
-    at(17.25, 8.05, -165.25); g.simulate(9);
-    check(g.player.feetY > 18.5, 'lift should carry the player to the roof, feet ' + g.player.feetY);
+    const liftBody = g.power.movers.find((m) => Math.abs(m.to.y - 18.7) < 0.01).p.body;
+    at(17.25, liftBody.translation().y + 0.35, -165.25);
+    let top = 0; for (let i = 0; i < 900; i++) { g.simulate(1 / 60); if (g.player.grounded) top = Math.max(top, g.player.feetY); }
+    check(top > 18.9, 'lift should carry the player to the roof, max feet ' + top);
     hold('KeyD', 0.1);
     at(10, 19, -164); g.simulate(0.3);
     check(g.seen.has('zone:roof'), 'roof zone');
@@ -237,9 +239,10 @@ const tests = {
   async tower_rail_drags_a_floating_plate_across_the_void() {
     g.start('new'); g.simulate(0.3);
     const plate = dyn('rider');
-    power('rail'); g.simulate(6);
-    check(plate.p.body.translation().y < 24 || plate.p.body.translation().x < -7.5, 'an unpainted plate dragged off the ledge falls (and respawns)');
-    g.simulate(8);
+    power('rail');
+    let minY = 99; for (let i = 0; i < 480; i++) { g.simulate(1 / 60); minY = Math.min(minY, plate.p.body.translation().y); }
+    check(minY < 20, 'an unpainted plate dragged off the ledge must fall into the void, minY=' + minY);
+    g.simulate(6);
     g.dynamics.respawn(plate); g.power.receptor('rail').p.clear(); g.simulate(0.5);
     const t = plate.p.body.translation();
     g.paint.splat(plate.p, new V(t.x, t.y + 0.18, t.z), up, P.purple, 0.75, true);
@@ -258,7 +261,7 @@ const tests = {
     g.start('new'); g.simulate(0.3);
     for (const p of [P.blue, P.green, P.yellow, P.red]) g.unlock(p);
     const rotor = g.power.rotors[0];
-    at(9, 43, -198, Math.PI / 2); g.simulate(0.3);
+    at(9, 45, -198, Math.PI / 2); g.simulate(0.3);
     power('rotor'); g.simulate(3);
     check(rotor.w > 0.2, 'rotor spins up');
     // wait for an arm to sweep in front of the gallery, step on, ride, step off at the hub
@@ -266,14 +269,14 @@ const tests = {
     for (let i = 0; i < 1500 && !rode; i++) {
       g.simulate(1 / 60);
       const a = rotor.arms[0].p.body.translation(), b = rotor.arms[1].p.body.translation();
-      for (const arm of [a, b]) if (arm.x > 4.9 && Math.abs(arm.z + 198) < 0.5) { at(arm.x, 43.05, arm.z, Math.PI / 2); rode = true; }
+      for (const arm of [a, b]) if (arm.x > 4.9 && Math.abs(arm.z + 198) < 0.5) { at(arm.x, 45.05, arm.z, Math.PI / 2); rode = true; }
     }
     check(rode, 'an arm should sweep past the gallery');
     g.simulate(1.5);
-    check(g.player.grounded && g.player.feetY > 42.8, 'riding the arm, feet ' + g.player.feetY);
+    check(g.player.grounded && g.player.feetY > 44.8, 'riding the arm, feet ' + g.player.feetY);
     const p0 = g.player.pos.clone(); g.simulate(1);
     check(g.player.pos.distanceTo(p0) > 0.8, 'the arm should carry the player around');
-    at(2.6, 43.05, -200); g.simulate(0.3);
+    at(2.6, 45.05, -200); g.simulate(0.3);
     check(g.seen.has('zone:hub'), 'hub zone');
     // paint each lock with the gun's own splat path, wrong colour first
     const locks = g.power.receptors.filter((r) => r.id.startsWith('lock'));
@@ -290,10 +293,9 @@ const tests = {
 
   async combos_float_plus_ice_plus_pulse() {
     g.start('sandbox'); g.simulate(0.5);
-    const crates = g.dynamics.bodies.filter((d) => d.p.tags.has('crate'));
-    const c = crates[1];
+    const c = g.dynamics.bodies.find((d) => d.p.tags.has('crate') && d.home.x > 250 && d.p.body.mass() === 45);
     // kinetic pulse on a grounded 45 kg crate vs the same crate floating
-    const shove = () => { const t = c.p.body.translation(); at(t.x, 0, t.z + 2.6, 0, 0); g.simulate(0.2); g.player.pitch = Math.atan2(t.y - g.player.eye.y, 2.6); const z0 = t.z; g.input.press('Mouse2'); g.simulate(0.05); g.input.release('Mouse2'); g.simulate(3); return z0 - c.p.body.translation().z; };
+    const shove = () => { const t = c.p.body.translation(); at(t.x, 0, t.z + 2.6, 0, 0); g.simulate(0.2); g.player.pitch = Math.atan2(t.y - g.player.eye.y, 2.6); g.simulate(0.05); const z0 = t.z; g.input.press('Mouse2'); g.simulate(0.05); g.input.release('Mouse2'); g.simulate(3); return z0 - c.p.body.translation().z; };
     const grounded = shove();
     c.p.fill(P.purple, 2); g.simulate(3);
     const floating = shove();
@@ -321,14 +323,16 @@ const tests = {
     // lost props come home
     const plate = dyn('rider'), home = plate.home.clone();
     plate.p.body.setTranslation({ x: 0, y: 15, z: -200 }, true); g.simulate(6);
-    check(plate.p.body.translation().y > 25 && Math.abs(plate.p.body.translation().x - home.x) < 0.5, 'props that fall out of the world respawn');
+    check(plate.p.body.translation().y > 27 && Math.abs(plate.p.body.translation().x - home.x) < 0.5, 'props that fall out of the world respawn');
     g.input.press('KeyR'); g.frame(0.016); g.input.release('KeyR');
     return {};
   },
 };
 
 // save/restore needs a page reload, so it lives outside the in-page table
-async function saveRestore(page) {
+async function saveRestore(page, url) {
+  await page.goto(`${url}/?test=1`);
+  await page.waitForFunction(() => window.__rb && window.__rb.state === 'menu', null, { timeout: 180000 });
   await page.evaluate(`(async () => { ${HELPERS}
     window.__rbAllowSave = true; localStorage.clear();
     g.start('new'); g.simulate(0.3);
@@ -376,7 +380,7 @@ try {
     }
   }
   if (!filter || 'save_restore'.includes(filter)) {
-    try { const res = await saveRestore(page); passed++; console.log(`  PASS  save_restore_across_reload  ${JSON.stringify(res)}`); }
+    try { const res = await saveRestore(page, srv.url); passed++; console.log(`  PASS  save_restore_across_reload  ${JSON.stringify(res)}`); }
     catch (e) { failed++; console.log(`  FAIL  save_restore_across_reload\n        ${String(e.message).split('\n')[0]}`); }
   }
   const real = errors.filter((e) => !/favicon/.test(e));

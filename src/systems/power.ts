@@ -126,7 +126,9 @@ export class Conveyor {
       if (!d.hovering && d.clearance > 0.5) continue;
       const grip = d.icy && !d.hovering ? 0.1 : 1;
       const v = b.linvel();
-      const k = Math.min(1, 4 * dt * grip);
+      // a body resting on the belt has to beat static friction against the (static) belt collider,
+      // so it is driven hard; a hovering one is only dragged gently by the field
+      const k = Math.min(1, (d.hovering ? 4 : 40) * dt * grip);
       const kl = Math.min(1, 2 * dt * grip);
       const off = t[lat] - centre;
       if (this.axis === 'x') b.setLinvel({ x: v.x + (this.vel.x - v.x) * k, y: v.y, z: v.z + (-off * 1.5 - v.z) * kl }, true);

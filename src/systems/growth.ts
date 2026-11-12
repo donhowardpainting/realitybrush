@@ -170,6 +170,9 @@ export class Growth {
     const st = new Stalk(base, bed, cap, trunk, (bed.data.growStart as number) ?? 2.2, (bed.data.growMax as number) ?? 6.5);
     cap.data.stalk = st;
     this.stalks.push(st);
+    // if the player is standing right where it sprouts, let it pick them up
+    const pl = game.player;
+    if (Math.abs(pl.pos.x - base.x) < 1.25 && Math.abs(pl.pos.z - base.z) < 1.25 && pl.feetY > base.y - 0.3 && pl.feetY < base.y + 0.7) pl.liftTo(base.y + 0.32);
     game.audio.grow();
     game.glow.burst(base, _y, PAINTS[Paint.Green].color, 40, 5, 0.09, 0.9, -1, 1.6);
     game.emit('grow:stalk');

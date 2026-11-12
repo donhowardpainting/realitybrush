@@ -226,6 +226,7 @@ export function buildWorld(game: Game, b: Builder): LevelDef {
    *  2. THE MACHINE WORKS
    * ===================================================================== */
   for (const [x0, x1] of [[-14, 0], [0, 14]]) b.box(x0, x1, -6, 0, -112, -95, 'pavers');
+  b.box(-3, 3, -1, 0, -113.5, -112, 'steel');
   b.wall(-15.5, -14, 0, 20, -112, -96, 'concrete', ['x+']); b.wall(14, 15.5, 0, 20, -112, -96, 'concrete', ['x-']);
   b.wall(-21.5, -3, 0, 22, -113.5, -112, 'panel', ['z+'], { windows: false, trim: 'steel', skip: [[-30, -14], [14, 30]] });
   b.wall(3, 21.5, 0, 22, -113.5, -112, 'panel', ['z+'], { windows: false, trim: 'steel', skip: [[-30, -14], [14, 30]] });
@@ -283,8 +284,9 @@ export function buildWorld(game: Game, b: Builder): LevelDef {
   const rBelts = b.receptor('belts', -6.6, 1.8, -118.9, 'z+', 'MAG-LINE A/B');
   b.box(-7.5, -5.7, 0, 3.1, -119.6, -118.9, 'panel');
   const beltsOn = () => rBelts.on;
-  b.conveyor(-13, -9, 1.5, -134, -120, -1, 2.3, beltsOn);
-  b.conveyor(-13, -9, 1.5, -156.4, -137.2, -1, 2.3, beltsOn);
+  // line A's field reaches across the wreck so a hovering load is handed straight to line B
+  b.conveyor(-13, -9, 1.5, -134, -120, -1, 2.3, beltsOn, 9).min.z = -137.6;
+  b.conveyor(-13, -9, 1.5, -156.4, -137.2, -1, 2.3, beltsOn, 9);
   b.box(-13.7, -8.3, 0, 3.3, -137, -134.3, 'rust');
   b.dbox(-14.5, -7.5, 3.2, 3.7, -136.4, -135.2, 'rust', false, [0, 0.25, 0.12]);
   b.dbox(-12, -11.5, 0, 5.2, -136, -135.4, 'rust', false, [0.2, 0, 0.3]);
@@ -297,7 +299,7 @@ export function buildWorld(game: Game, b: Builder): LevelDef {
   { const m = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.12, 3.6), socketGlow); m.position.set(-11, 1.03, -158.6); scene.add(m); }
   b.sign(['CORE SOCKET', 'MAIN BUS — OFFLINE'], -11, 4.6, -160.05, 'z+', 4, 1.1, '#ffa040', 1.2);
   const core = b.dyn(-11, 2.22, -123, 1.4, 1.4, 1.4, 'core', 600, { tags: ['core'] });
-  const socket = new Socket('core', V(-13.4, 1, -160.6), V(-8.6, 9, -156.9), V(-11, 1.72, -158.6), 'core');
+  const socket = new Socket('core', V(-13.4, 1, -160.6), V(-8.6, 11.5, -156.9), V(-11, 1.72, -158.6), 'core');
   power.sockets.push(socket);
   const busOn = () => socket.filled;
   b.dbox(-13.2, -8.8, 0, 0.02, -120.2, -119.8, 'hazard');
@@ -374,6 +376,7 @@ export function buildWorld(game: Game, b: Builder): LevelDef {
   for (let x = 21.5; x <= 36; x += 2.9) b.dbox(x - 0.07, x + 0.07, 6.85, 7.3, -150, -128, 'steel');
   for (let z = -150; z <= -128; z += 5.5) b.dbox(21.5, 36, 6.85, 7.3, z - 0.07, z + 0.07, 'steel');
   for (const [x, z] of [[26, -146], [31, -134], [28.5, -139]]) stage.addShaft(V(x, 7, z), shaftDir, 8.5, 3.6, 0xdfffd0, 0.2);
+  b.box(20, 21.5, -1, 0, -142, -136, 'steel');
   const shutter = b.kin(20.75, 2.25, -139, 1.3, 4.5, 6, 'rust');
   b.mover(shutter, V(20.75, 6.9, -139), 1.8, 'hold', busOn, 0, true);
   b.sign(['GREENHOUSE', 'SHUTTER ON MAIN BUS'], 19.95, 5.4, -139, 'x-', 3.2, 0.9, '#4cff62');
@@ -444,7 +447,7 @@ export function buildWorld(game: Game, b: Builder): LevelDef {
   beam.position.set(0, 140, TZ); scene.add(beam);
   const halo = new THREE.Mesh(new THREE.CylinderGeometry(3, 3, 300, 20, 1, true), beamMat);
   halo.position.copy(beam.position); halo.scale.set(1, 1, 1); scene.add(halo);
-  const coreLight = new THREE.PointLight(0xa070ff, 30, 40, 1.6); coreLight.position.set(0, 46, TZ); scene.add(coreLight);
+  const coreLight = new THREE.PointLight(0xa070ff, 30, 40, 1.6); coreLight.position.set(0, 48, TZ); scene.add(coreLight);
   // debris orbiting the beam
   const debris = new THREE.InstancedMesh(prep(new THREE.BoxGeometry(1, 1, 1)), mats.m.alloy, 70);
   const debrisData = Array.from({ length: 70 }, () => ({ r: rr(2.2, 5.2), y: rr(4, 84), a: rr(0, 6.28), w: rr(0.1, 0.5) * (rnd() < 0.5 ? -1 : 1), s: rr(0.12, 0.5), rise: rr(0.2, 1) }));
@@ -476,62 +479,62 @@ export function buildWorld(game: Game, b: Builder): LevelDef {
   b.dyn(-4.9, 19.2, -191.7, 2.6, 0.35, 2.6, 'slab', 120, { ry: 0.3 });
   b.dyn(-4.9, 19.56, -191.6, 2.6, 0.35, 2.6, 'slab', 120, { ry: -0.2 });
   b.dyn(3.5, 19.52, -191.2, 1, 1, 1, 'crate', 45); b.dyn(5.2, 19.52, -192, 1, 1, 1, 'crate', 45, { ry: 0.5 });
-  b.box(-11, -6, 24.9, 25.5, -211, -196, 'alloy');
-  b.dbox(-6.1, -6, 24.9, 25.5, -211, -196, b.glowKey(0xa544ff, 1.5));
-  zones.addTrigger('w1', -11, -6, 25.7, 30, -211, -196);
+  b.box(-11, -6, 26.9, 27.5, -211, -196, 'alloy');
+  b.dbox(-6.1, -6, 26.9, 27.5, -211, -196, b.glowKey(0xa544ff, 1.5));
+  zones.addTrigger('w1', -11, -6, 27.7, 32, -211, -196);
 
   // T2: mag-rail across the void
-  b.dyn(-8.5, 25.7, -208.4, 2.6, 0.35, 2.6, 'slab', 120, { tags: ['rider'] });
-  const rRail = b.receptor('rail', -11, 27.3, -202, 'x+', 'MAG-RAIL');
+  b.dyn(-8.5, 27.7, -208.4, 2.6, 0.35, 2.6, 'slab', 120, { tags: ['rider'] });
+  const rRail = b.receptor('rail', -11, 29.3, -202, 'x+', 'MAG-RAIL');
   const railGlow = mats.glow(0xff3030, 0.2);
-  for (const y of [24.3, 29.6]) {
+  for (const y of [26.3, 31.6]) {
     b.dbox(-10.5, 4.5, y, y + 0.25, -210.95, -210.6, 'steel');
     for (let x = -9.5; x < 4.5; x += 1.5) { const m = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.12, 0.2), railGlow); m.position.set(x, y + 0.12, -210.55); scene.add(m); }
   }
-  power.conveyors.push(new Conveyor(null, V(1, 0, 0), 2.3, V(-10.6, 24.6, -211), V(4.4, 31, -206), () => rRail.on));
-  b.box(3, 11, 24.9, 25.5, -211, -203, 'alloy');
-  b.dbox(2.9, 3, 24.9, 25.5, -211, -203, b.glowKey(0xa544ff, 1.5));
-  b.sign(['STAGE 2', 'THE RAIL DRAGS WHAT FLOATS'], -10.95, 29.3, -206.5, 'x+', 3.2, 0.9, '#ff3030');
-  zones.addTrigger('n1', 3, 11, 25.7, 30, -211, -203);
-  zones.addCheckpoint('n1', 5, 25.5, -204.6, -Math.PI / 2, 'North Gallery');
+  power.conveyors.push(new Conveyor(null, V(1, 0, 0), 2.3, V(-10.6, 26.6, -211), V(4.4, 33, -206), () => rRail.on));
+  b.box(3, 11, 26.9, 27.5, -211, -203, 'alloy');
+  b.dbox(2.9, 3, 26.9, 27.5, -211, -203, b.glowKey(0xa544ff, 1.5));
+  b.sign(['STAGE 2', 'THE RAIL DRAGS WHAT FLOATS'], -10.95, 31.3, -206.5, 'x+', 3.2, 0.9, '#ff3030');
+  zones.addTrigger('n1', 3, 11, 27.7, 32, -211, -203);
+  zones.addCheckpoint('n1', 5, 27.5, -204.6, -Math.PI / 2, 'North Gallery');
 
   // T3: moss buttress and seed bed
-  b.box(5, 11, 25.5, 34, -211, -207.5, 'moss', { fertile: 'vine' });
-  const towerBed = b.box(6, 10.4, 34, 34.2, -210.6, -208.2, 'soil', { fertile: 'stalk' });
+  b.box(5, 11, 27.5, 36, -211, -207.5, 'moss', { fertile: 'vine' });
+  const towerBed = b.box(6, 10.4, 36, 36.2, -210.6, -208.2, 'soil', { fertile: 'stalk' });
   towerBed.data.growMax = 6.4; towerBed.data.maxStalks = 2;
-  zones.addTrigger('n2', 5, 11, 34.2, 38, -211, -207.5);
-  b.sign(['STAGE 3', 'GROW IT. THEN MAKE IT BOUNCE.'], 8, 37.6, -210.95, 'z+', 3.4, 0.9, '#4cff62');
-  b.box(6.9, 11, 42.4, 43, -206.5, -192, 'alloy');
-  b.dbox(6.8, 6.9, 42.4, 43, -206.5, -192, b.glowKey(0xa544ff, 1.5));
-  zones.addTrigger('e1', 6.9, 11, 43.2, 47, -206.5, -192);
-  zones.addCheckpoint('e1', 9, 43, -198, Math.PI / 2, 'East Gallery');
+  zones.addTrigger('n2', 5, 11, 36.2, 40, -211, -207.5);
+  b.sign(['STAGE 3', 'GROW IT. THEN MAKE IT BOUNCE.'], 8, 39.6, -210.95, 'z+', 3.4, 0.9, '#4cff62');
+  b.box(6.9, 11, 44.4, 45, -206.5, -192, 'alloy');
+  b.dbox(6.8, 6.9, 44.4, 45, -206.5, -192, b.glowKey(0xa544ff, 1.5));
+  zones.addTrigger('e1', 6.9, 11, 45.2, 49, -206.5, -192);
+  zones.addCheckpoint('e1', 9, 45, -198, Math.PI / 2, 'East Gallery');
 
   // T4: the rotor and the core
-  const rRotor = b.receptor('rotor', 11, 44.9, -194.4, 'x-', 'ROTOR DRIVE');
-  const arms = [0, Math.PI].map((phase) => ({ p: b.kin(0, 42.8, TZ, 2.9, 0.4, 1.9, 'hazard'), radius: 5.15, phase }));
-  const spinner = new THREE.Group(); spinner.position.set(0, 42.5, TZ); scene.add(spinner);
-  { const ring = new THREE.Mesh(prep(new THREE.TorusGeometry(3.75, 0.16, 8, 40).rotateX(Math.PI / 2)), mats.m.steel); spinner.add(ring);
+  const rRotor = b.receptor('rotor', 11, 46.9, -194.4, 'x-', 'ROTOR DRIVE');
+  const arms = [0, Math.PI].map((phase) => ({ p: b.kin(0, 44.8, TZ, 2.9, 0.4, 1.9, 'hazard'), radius: 5.15, phase }));
+  const spinner = new THREE.Group(); spinner.position.set(0, 44.5, TZ); scene.add(spinner);
+  { const ring = new THREE.Mesh(prep(new THREE.TorusGeometry(3.75, 0.16, 8, 42).rotateX(Math.PI / 2)), mats.m.steel); spinner.add(ring);
     for (const a of [0, Math.PI]) { const s = new THREE.Mesh(prep(new THREE.BoxGeometry(3.1, 0.2, 0.3)), mats.m.steel); s.position.set(Math.cos(a) * 5.15, -0.05, -Math.sin(a) * 5.15); s.rotation.y = a; spinner.add(s); } }
-  power.rotors.push(new Rotor(V(0, 42.8, TZ), arms, 0.42, () => rRotor.on, Math.PI / 2, spinner));
-  b.cyl(0, 42.4, 43, TZ, 3.5, 'alloy', true, 8);
-  { const g = new THREE.TorusGeometry(3.5, 0.08, 6, 8); g.rotateX(Math.PI / 2); g.translate(0, 43.02, TZ); b.deco(g, b.glowKey(0xa544ff, 2)); }
-  for (const [sx, sz] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) b.pipe(V(sx * 2.4, 42.3, TZ + sz * 2.4), V(sx * 11, 37, TZ + sz * 11), 0.14, 'steel', false, 6);
-  b.cyl(0, 43, 43.5, TZ, 1.25, 'steel', true, 10);
+  power.rotors.push(new Rotor(V(0, 44.8, TZ), arms, 0.42, () => rRotor.on, Math.PI / 2, spinner));
+  b.cyl(0, 44.4, 45, TZ, 3.5, 'alloy', true, 8);
+  { const g = new THREE.TorusGeometry(3.5, 0.08, 6, 8); g.rotateX(Math.PI / 2); g.translate(0, 45.02, TZ); b.deco(g, b.glowKey(0xa544ff, 2)); }
+  for (const [sx, sz] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) b.pipe(V(sx * 2.4, 44.3, TZ + sz * 2.4), V(sx * 11, 39, TZ + sz * 11), 0.14, 'steel', false, 6);
+  b.cyl(0, 45, 45.5, TZ, 1.25, 'steel', true, 10);
   const coreOrb = new THREE.Mesh(new THREE.IcosahedronGeometry(0.75, 2), mats.glow(0xb890ff, 1.5));
-  coreOrb.position.set(0, 45.4, TZ); scene.add(coreOrb);
+  coreOrb.position.set(0, 47.4, TZ); scene.add(coreOrb);
   const locks: Receptor[] = PAINT_ORDER.map((need, i) => {
     const a = (i / 5) * Math.PI * 2 + 0.3;
     const x = Math.sin(a) * 1.75, z = TZ + Math.cos(a) * 1.75;
-    const plate = b.slab(x, 44.35, z, 1.25, 1.5, 0.16, 'lab', { ry: a, tags: ['lock'] });
+    const plate = b.slab(x, 46.35, z, 1.25, 1.5, 0.16, 'lab', { ry: a, tags: ['lock'] });
     const lamp = mats.glow(PAINTS[need].hex, 0.3);
     const fr = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.75, 0.1), lamp);
-    fr.position.set(Math.sin(a) * 1.66, 44.35, TZ + Math.cos(a) * 1.66); fr.rotation.y = a; scene.add(fr);
+    fr.position.set(Math.sin(a) * 1.66, 46.35, TZ + Math.cos(a) * 1.66); fr.rotation.y = a; scene.add(fr);
     const r = new Receptor('lock' + i, plate, need, lamp);
     power.receptors.push(r);
     return r;
   });
-  zones.addTrigger('hub', -3.5, 3.5, 43.2, 48, TZ - 3.5, TZ + 3.5);
-  b.sign(['STAGE 4', 'FIVE LOCKS · FIVE COLOURS'], 10.95, 47.4, -199, 'x-', 3.4, 0.9, '#e8e2d0');
+  zones.addTrigger('hub', -3.5, 3.5, 45.2, 50, TZ - 3.5, TZ + 3.5);
+  b.sign(['STAGE 4', 'FIVE LOCKS · FIVE COLOURS'], 10.95, 49.4, -199, 'x-', 3.4, 0.9, '#e8e2d0');
 
   /* ---- distant skyline ---- */
   {
@@ -592,6 +595,10 @@ export function buildWorld(game: Game, b: Builder): LevelDef {
       game.hud.hint('Missed your ride? <kbd>Q</kbd> selects SOLVENT — strip the purple and the mass comes back down.', 10);
       missedRide = -1;
     }
+  });
+  game.on('respawn', () => {
+    const rider = game.dynamics.bodies.find((d) => d.p.tags.has('rider'));
+    if (rider && !game.seen.has('zone:n1') && game.zones.current?.id === 'tower') game.dynamics.respawn(rider);
   });
   game.on('zone:hall', () => game.hud.hint('<kbd>RMB</kbd> fires a kinetic pulse — it shoves anything loose, especially things that float.', 9));
   game.on('power:belts', () => { if (!socket.filled) game.hud.hint('The mag-line drags whatever sits in its field… including anything hovering above it.', 9); });

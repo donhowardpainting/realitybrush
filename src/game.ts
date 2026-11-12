@@ -75,6 +75,8 @@ export class Game {
     this.drops = new Particles(2500, false);
     this.stage.scene.add(this.glow.points, this.drops.points);
     window.addEventListener('resize', () => this.stage.resize());
+    // browsers may refuse an immediate re-lock after Esc; a click on the view always recovers
+    canvas.addEventListener('click', () => { if (this.state === 'playing' && !this.input.locked) this.input.lock(); });
   }
 
   get unlocked(): Set<Paint> { return this.mode === 'sandbox' ? ALL : this.unlockedStory; }
@@ -170,13 +172,20 @@ export class Game {
 
   currentObjective(): string {
     if (this.mode === 'sandbox') return 'Sandbox';
-    for (const o of this.level.objectives) if (!this.seen.has(o.until)) return o.text;
-    return 'Reality rewritten. The city is yours.';
+    return this.objectiveNow()?.text ?? 'Reality rewritten. The city is yours.';
+  }
+
+  /** The objective after the furthest one reached (tolerates sequence breaks). */
+  private objectiveNow() {
+    const list = this.level.objectives;
+    let i = list.length - 1;
+    while (i >= 0 && !this.seen.has(list[i].until)) i--;
+    return list[i + 1];
   }
 
   private refreshObjective(withHint = false) {
     if (this.mode === 'sandbox') { this.hud.objective('TEST RANGE — every pigment unlocked. C spawns a crate. Experiment.', PAINTS[Paint.Yellow].css); return; }
-    const o = this.level.objectives.find((x) => !this.seen.has(x.until));
+    const o = this.objectiveNow();
     if (!o) { this.hud.objective('Reality rewritten. The city is yours.', '#52ffe0'); return; }
     this.hud.objective(o.text, o.color ?? '#ffffff');
     if (withHint && o.hint) this.hintQueue = { t: 2.2, html: o.hint };
@@ -206,6 +215,7 @@ export class Game {
     this.player.gravScale = 1;
     this.stage.fade = 1; this.stage.fadeTarget = 0;
     this.audio.respawn();
+    this.emit('respawn');
   }
 
   /** Put loose props near the player back where they started (soft-lock escape hatch). */
@@ -396,6 +406,8 @@ export class Game {
       this.fixed(FIXED);
       this.input.endFrame();
       this.paint.update(FIXED);
+      this.player.updateCamera(this.stage.camera, 1, FIXED);
+      this.stage.camera.updateMatrixWorld(true);
     }
     this.paint.syncVisuals();
   }

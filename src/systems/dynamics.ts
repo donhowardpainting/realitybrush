@@ -33,6 +33,13 @@ export class DynBody {
   fullAt: number;
   baseFriction: number;
   holdY: number | null = null;
+  private rest = -1;
+
+  /**
+   * Rapier caches friction/restitution inside persisting contact manifolds, so a material change
+   * on a body at rest would otherwise be ignored. Re-assigning the shape invalidates them.
+   */
+  touch() { this.p.collider.setShape(this.p.collider.shape); }
 
   constructor(public p: Paintable, public o: DynOpts) {
     const t = p.body.translation(), r = p.body.rotation();
@@ -40,7 +47,7 @@ export class DynBody {
     this.homeRot = new THREE.Quaternion(r.x, r.y, r.z, r.w);
     this.maxHover = o.maxHover ?? 6.5;
     this.fullAt = o.fullAt ?? 0.5;
-    this.baseFriction = o.friction ?? 0.85;
+    this.baseFriction = o.friction ?? 1.7;
     if (o.lockTilt) p.body.setEnabledRotations(false, false, false, true);
   }
 
@@ -51,8 +58,9 @@ export class DynBody {
     this.lift = Math.max(0, Math.min(1, (cP - 0.015) / (this.fullAt - 0.015)));
     this.cB = this.p.coverage(Paint.Blue);
     this.cY = this.p.coverage(Paint.Yellow);
-    this.p.collider.setRestitution(0.05 + 0.8 * Math.min(1, this.cY / 0.2));
-    this.p.collider.setRestitutionCombineRule(this.cY > 0.05 ? RAPIER.CoefficientCombineRule.Max : RAPIER.CoefficientCombineRule.Average);
+    // averaged against static surfaces (which have zero restitution)
+    const rest = 0.1 + 1.55 * Math.min(1, this.cY / 0.2);
+    if (Math.abs(rest - this.rest) > 0.02) { this.rest = rest; this.p.collider.setRestitution(rest); this.touch(); }
   }
 }
 
@@ -150,6 +158,11 @@ export class Dynamics {
         want += Math.sin(time * 1.3 + d.phase) * 0.07;
         const k = Math.min(1, 5 * dt);
         b.setLinvel({ x: v.x, y: v.y + (want - v.y) * k, z: v.z }, true);
+        // anti-gravity shimmer shedding from the underside
+        if (Math.random() < 0.25 && Math.abs(t.x - game.player.pos.x) + Math.abs(t.z - game.player.pos.z) < 45) {
+          const c = PAINTS[Paint.Purple].color;
+          game.glow.spawn(t.x + (Math.random() * 2 - 1) * ex, t.y - ey, t.z + (Math.random() * 2 - 1) * ez, 0, -0.7, 0, c.r, c.g, c.b, 0.06, 1.1, 0.4, 0.2, 0.9);
+        }
       } else {
         if (d.hovering) {
           d.hovering = false; d.holdY = null;
@@ -172,8 +185,8 @@ export class Dynamics {
       const icy = d.cB > 0.1 || (groundPaint === Paint.Blue && clearance < 0.2);
       if (icy !== d.icy) {
         d.icy = icy;
-        p.collider.setFriction(icy ? 0.015 : d.baseFriction);
-        p.collider.setFrictionCombineRule(icy ? RAPIER.CoefficientCombineRule.Min : RAPIER.CoefficientCombineRule.Average);
+        p.collider.setFriction(icy ? 0.03 : d.baseFriction);
+        d.touch();
         b.wakeUp();
       }
     }

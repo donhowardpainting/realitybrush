@@ -166,8 +166,10 @@ export class Paintable {
     this.body = physics.world.createRigidBody(bd);
     const cd = RAPIER.ColliderDesc.cuboid(o.half.x, o.half.y, o.half.z)
       .setCollisionGroups(WORLD_GROUPS)
-      .setFriction(o.friction ?? 0.85)
-      .setRestitution(0.05);
+      // Friction is averaged between the two colliders in contact. Static surfaces carry none of
+      // their own, so a body's coefficient alone decides how it grips: 1.7 -> 0.85, iced 0.03 -> 0.015.
+      .setFriction(type === 'dynamic' ? (o.friction ?? 1.7) : 0)
+      .setRestitution(0);
     if (o.mass) cd.setMass(o.mass);
     this.collider = physics.world.createCollider(cd, this.body);
 

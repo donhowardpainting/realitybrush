@@ -83,6 +83,15 @@ export class Player {
 
   get feetY() { return this.pos.y - FEET; }
 
+  /** Pop the player up so their feet rest at `y` (something just grew underneath them). */
+  liftTo(y: number) {
+    this.pos.y = y + FEET + 0.04;
+    this.prevPos.copy(this.pos);
+    this.body.setTranslation(this.pos, true);
+    this.body.setNextKinematicTranslation(this.pos);
+    this.vel.y = 0;
+  }
+
   /** Per-render-frame: mouse look + input edge capture. */
   frame(dt: number) {
     const inp = this.game.input;
@@ -156,6 +165,10 @@ export class Player {
     const col = ph.castRay(this.pos.x, this.pos.y, this.pos.z, 0, -1, 0, 9);
     this.lowG = false;
     if (col) { const p = game.paint.get(col.collider); if (p && p.typeAt(col.point, col.normal) === Paint.Purple) this.lowG = true; }
+    if (this.lowG && Math.random() < 0.5) {
+      const c = PAINTS[Paint.Purple].color;
+      game.glow.spawn(this.pos.x + (Math.random() - 0.5) * 1.6, this.pos.y - 0.8 + Math.random() * 0.5, this.pos.z + (Math.random() - 0.5) * 1.6, 0, 1.6, 0, c.r, c.g, c.b, 0.05, 0.9, -0.4, 0.3, 0.9);
+    }
 
     let jumped = false;
     if (wasGrounded) {
@@ -202,8 +215,9 @@ export class Player {
     this.body.setNextKinematicTranslation(this.pos);
 
     // --- ground state / bounce ---
-    let ng = this.ctl.computedGrounded() && !jumped;
     const g2 = this.probe(this.pos, FEET + 0.3);
+    // the controller's own flag can be stale after a teleport, so it must agree with the probe
+    let ng = this.ctl.computedGrounded() && !jumped && !!g2 && g2.toi <= FEET + 0.25;
     if (!ng && !jumped && g2 && g2.toi <= FEET + 0.05 && v.y <= 0 && g2.normal.y > 0.6) ng = true;
     if (ng && !wasGrounded && v.y > 0.5) ng = false;
     if (ng) {
@@ -284,7 +298,6 @@ export class Player {
       if (hl < 1e-4) continue;
       nx /= hl; nz /= hl;
       // orient the normal from the obstacle toward the player
-      const cp = c.collider.parent();
       const into0 = v.x * nx + v.z * nz;
       if (into0 > 0) { nx = -nx; nz = -nz; }
       const into = v.x * nx + v.z * nz;
@@ -304,12 +317,16 @@ export class Player {
         }
         if (!bounced) { v.x -= into * nx; v.z -= into * nz; }
       }
-      if (cp && cp.isDynamic() && moving) {
-        const bt = cp.translation();
-        if ((bt.x - this.pos.x) * wx + (bt.z - this.pos.z) * wz > 0) {
-          const bv = cp.linvel();
-          if (bv.x * wx + bv.z * wz < WALK) cp.applyImpulse({ x: wx * PUSH_FORCE * dt, y: 0, z: wz * PUSH_FORCE * dt }, true);
-        }
+    }
+    // Pushing: probe ahead in the walk direction so it also works when barely moving (e.g. on ice).
+    if (moving) {
+      for (const dy of [-0.45, 0.15]) {
+        const h = game.physics.castRay(this.pos.x, this.pos.y + dy, this.pos.z, wx, 0, wz, RADIUS + 0.14);
+        const b = h?.collider.parent();
+        if (!h || !b || !b.isDynamic()) continue;
+        const bv = b.linvel();
+        if (bv.x * wx + bv.z * wz < WALK) b.applyImpulse({ x: wx * PUSH_FORCE * dt, y: 0, z: wz * PUSH_FORCE * dt }, true);
+        break;
       }
     }
   }

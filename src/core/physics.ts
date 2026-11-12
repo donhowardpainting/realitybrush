@@ -97,13 +97,13 @@ export class Physics {
 
   /** Static scenery collider (not paintable). */
   sceneryBox(cx: number, cy: number, cz: number, hx: number, hy: number, hz: number, q?: THREE.Quaternion) {
-    const d = RAPIER.ColliderDesc.cuboid(hx, hy, hz).setTranslation(cx, cy, cz).setCollisionGroups(WORLD_GROUPS).setFriction(0.8);
+    const d = RAPIER.ColliderDesc.cuboid(hx, hy, hz).setTranslation(cx, cy, cz).setCollisionGroups(WORLD_GROUPS).setFriction(0);
     if (q) d.setRotation(q);
     return this.world.createCollider(d, this.scenery);
   }
 
   sceneryCylinder(cx: number, cy: number, cz: number, halfH: number, r: number, q?: THREE.Quaternion) {
-    const d = RAPIER.ColliderDesc.cylinder(halfH, r).setTranslation(cx, cy, cz).setCollisionGroups(WORLD_GROUPS).setFriction(0.8);
+    const d = RAPIER.ColliderDesc.cylinder(halfH, r).setTranslation(cx, cy, cz).setCollisionGroups(WORLD_GROUPS).setFriction(0);
     if (q) d.setRotation(q);
     return this.world.createCollider(d, this.scenery);
   }

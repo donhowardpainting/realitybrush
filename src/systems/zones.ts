@@ -113,7 +113,7 @@ export class Zones {
         const c = PAINTS[pk.paint].color;
         game.glow.spawn(pk.pos.x + (Math.random() - 0.5) * 0.8, pk.pos.y - 0.4, pk.pos.z + (Math.random() - 0.5) * 0.8, 0, 0.9, 0, c.r, c.g, c.b, 0.06, 1.2, -0.3, 0.5, 0.9);
       }
-      if (p.distanceTo(pk.pos) < 1.7) {
+      if (Math.hypot(p.x - pk.pos.x, p.z - pk.pos.z) < 2.7 && Math.abs(p.y - pk.pos.y) < 2.2) {
         this.hide(pk);
         game.unlock(pk.paint);
       }

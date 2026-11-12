@@ -157,7 +157,10 @@ export class Hud {
     if (g.mode === 'sandbox') {
       b.appendChild(this.btn('Reset sandbox objects', '', 'var(--yellow)', () => { g.resetProps(); g.resume(); }));
       b.appendChild(this.btn('Back to story', '', 'var(--purple)', () => g.start(g.hasSave() ? 'continue' : 'new')));
-    } else b.appendChild(this.btn('Sandbox', 'Your story progress is kept', 'var(--yellow)', () => g.start('sandbox')));
+    } else {
+      b.appendChild(this.btn('Reset nearby objects', 'Puts loose props back where they started', 'var(--yellow)', () => { g.resetProps(); g.resume(); }));
+      b.appendChild(this.btn('Sandbox', 'Your story progress is kept', 'var(--yellow)', () => g.start('sandbox')));
+    }
     b.appendChild(this.btn('Restart story', 'Erases progress', 'var(--red)', () => g.start('new')));
     m.querySelector('.menu-inner')!.appendChild(this.settings());
   }
