@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>REALITY BRUSH — Rewrite the World</title>
+  <meta name="description" content="A first-person physics sandbox where paint rewrites the rules of the world." />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230b0d12'/%3E%3Ccircle cx='11' cy='12' r='6' fill='%23a544ff'/%3E%3Ccircle cx='21' cy='12' r='6' fill='%2335c8ff' fill-opacity='.9'/%3E%3Ccircle cx='16' cy='21' r='6' fill='%23ffd21f' fill-opacity='.9'/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="/src/ui/style.css" />
+</head>
+<body>
+  <canvas id="c"></canvas>
+  <div id="hud" class="hidden">
+    <div id="crosshair"><i></i></div>
+    <div id="objective"><span class="tag">OBJECTIVE</span><span id="objective-text"></span></div>
+    <div id="hint"></div>
+    <div id="toasts"></div>
+    <div id="hotbar"></div>
+    <div id="paint-name"><b></b><span></span></div>
+    <div id="title-card"><h2></h2><p></p></div>
+    <div id="state-tags"></div>
+  </div>
+  <div id="loading">
+    <div class="load-inner">
+      <h1 class="logo">REALITY <span>BRUSH</span></h1>
+      <div class="bar"><i id="load-bar"></i></div>
+      <p id="load-text">Mixing pigments…</p>
+    </div>
+  </div>
+  <div id="menu" class="hidden"></div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

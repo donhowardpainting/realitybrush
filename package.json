@@ -1,0 +1,23 @@
+{
+  "name": "reality-brush",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "REALITY BRUSH — a first-person physics sandbox where paint rewrites the rules of the world.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --port 4173 --strictPort",
+    "typecheck": "tsc --noEmit",
+    "test": "node tests/run.mjs"
+  },
+  "dependencies": {
+    "@dimforge/rapier3d-compat": "^0.21.0",
+    "three": "^0.187.0"
+  },
+  "devDependencies": {
+    "@types/three": "^0.187.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.8"
+  }
+}
