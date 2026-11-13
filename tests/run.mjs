@@ -438,6 +438,32 @@ const tests = {
     return { shards: g.shardCount };
   },
 
+  async secrets_vaults_notes_and_upgrades() {
+    g.start('new'); g.simulate(0.3);
+    at(-3.6, 0, 13.8); g.simulate(0.3);
+    check(g.logCount === 1 && document.getElementById('log-card').classList.contains('show'), 'walking up to a terminal reads its note');
+    for (const [id, x, y, z, up] of [['vaultA', 9.4, 0, -32.6, 'nozzle'], ['vaultB', 14.9, 0, -121.2, 'capacitor'], ['vaultC', -9.6, 19, -156.2, 'amplifier']]) {
+      at(x, y, z, 0); hold('KeyW', 1.5);
+      check(g.player.pos.z > z - 2.2 && !g.hasUpgrade(up), id + ' must be sealed, z=' + g.player.pos.z);
+      const r = g.power.receptor(id);
+      r.p.fill(r.need === P.red ? P.blue : P.red); g.simulate(0.3);
+      check(!r.on, id + ' rejects the wrong pigment');
+      power(id); g.simulate(3);
+      at(x, y, z, 0); hold('KeyW', 2);
+      check(g.hasUpgrade(up), id + ' opens for its pigment and gives up its upgrade, at ' + g.player.pos.toArray().map(r2));
+    }
+    at(17, 0, -125); g.simulate(0.3);
+    check(g.upgradeCount === 3 && g.shardCount >= 1, 'three upgrades and the vault shard collected');
+    check(g.zones.shards.length === 16 && g.zones.logs.length === 11, 'find totals');
+    // the upgrades change the brush
+    at(300, 0, 10, 0, -0.45); g.simulate(0.2);
+    g.input.press('KeyE'); g.simulate(0.05); g.input.release('KeyE'); g.simulate(1.35);
+    check(g.gun.bombReady >= 1, 'capacitor halves the bomb cooldown');
+    g.pause();
+    check(document.querySelector('.notes') && document.querySelector('.notes').textContent.includes('WIDE NOZZLE'), 'finds are listed in the pause menu');
+    return { notes: g.logCount, upgrades: g.upgradeCount };
+  },
+
   async combos_float_plus_ice_plus_pulse() {
     g.start('sandbox'); g.simulate(0.5);
     const c = g.dynamics.bodies.find((d) => d.p.tags.has('crate') && d.home.x > 250 && d.p.body.mass() === 45);

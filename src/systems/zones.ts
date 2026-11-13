@@ -5,6 +5,8 @@ import { Paint, PAINTS } from '../paint/types';
 export interface Checkpoint { id: string; pos: THREE.Vector3; yaw: number; ring: THREE.Mesh; beam: THREE.Mesh; active: boolean; title: string }
 interface Trigger { id: string; min: THREE.Vector3; max: THREE.Vector3; fired: boolean; fn?: () => void }
 interface Shard { i: number; pos: THREE.Vector3; mesh: THREE.Mesh; taken: boolean }
+interface LogPoint { i: number; pos: THREE.Vector3; title: string; text: string; near: boolean }
+interface Upgrade { id: string; name: string; desc: string; pos: THREE.Vector3; mesh: THREE.Mesh; taken: boolean }
 interface Pickup { paint: Paint; pos: THREE.Vector3; group: THREE.Group; taken: boolean; halo: THREE.Mesh }
 
 /** Checkpoints, pigment pickups, trigger volumes and kill volumes. */
@@ -14,6 +16,8 @@ export class Zones {
   pickups: Pickup[] = [];
   kills: { min: THREE.Vector3; max: THREE.Vector3 }[] = [];
   shards: Shard[] = [];
+  logs: LogPoint[] = [];
+  upgrades: Upgrade[] = [];
   private shardMat = new THREE.MeshStandardMaterial({ color: 0x101418, emissive: 0x7fffe8, emissiveIntensity: 2.4, roughness: 0.2, metalness: 0.4 });
   killY = -3.2;
   current: Checkpoint | null = null;
@@ -78,6 +82,26 @@ export class Zones {
     this.game.stage.scene.add(mesh);
     this.shards.push({ i: this.shards.length, pos: new THREE.Vector3(x, y, z), mesh, taken: false });
   }
+
+  /** Research terminal: walk up to it to read (and keep) a field note. */
+  addLog(x: number, y: number, z: number, title: string, text: string) {
+    const scene = this.game.stage.scene;
+    const post = new THREE.Mesh(new THREE.BoxGeometry(0.34, 1.05, 0.26), new THREE.MeshStandardMaterial({ color: 0x15181d, roughness: 0.5, metalness: 0.7 }));
+    post.position.set(x, y + 0.52, z);
+    const screen = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.34, 0.05), new THREE.MeshStandardMaterial({ color: 0x050607, emissive: 0xffc46b, emissiveIntensity: 1.8, roughness: 0.4 }));
+    screen.position.set(x, y + 1.22, z); screen.rotation.x = -0.5;
+    scene.add(post, screen);
+    this.logs.push({ i: this.logs.length, pos: new THREE.Vector3(x, y, z), title, text, near: false });
+  }
+
+  /** Brush upgrade waiting to be found. */
+  addUpgrade(id: string, x: number, y: number, z: number, name: string, desc: string) {
+    const mesh = new THREE.Mesh(new THREE.TorusKnotGeometry(0.22, 0.07, 64, 8), new THREE.MeshStandardMaterial({ color: 0x141008, emissive: 0xffb43a, emissiveIntensity: 2.6, roughness: 0.3, metalness: 0.6 }));
+    mesh.position.set(x, y, z);
+    this.game.stage.scene.add(mesh);
+    this.upgrades.push({ id, name, desc, pos: new THREE.Vector3(x, y, z), mesh, taken: false });
+  }
+  hideUpgrade(id: string) { const u = this.upgrades.find((x) => x.id === id); if (u) { u.taken = true; u.mesh.visible = false; } }
 
   hideShard(i: number) { const s = this.shards[i]; if (s) { s.taken = true; s.mesh.visible = false; } }
 
@@ -144,6 +168,17 @@ export class Zones {
         this.hideShard(sh.i);
         game.collectShard(sh.i);
       }
+    }
+    for (const lg of this.logs) {
+      const d = Math.hypot(p.x - lg.pos.x, p.z - lg.pos.z);
+      if (!lg.near && d < 2.1 && Math.abs(fy - lg.pos.y) < 1.8) { lg.near = true; game.readLog(lg.i); }
+      else if (lg.near && d > 3.6) { lg.near = false; game.hud.hideLog(); }
+    }
+    for (const u of this.upgrades) {
+      if (u.taken) continue;
+      u.mesh.rotation.set(t * 0.9, t * 1.3, 0);
+      u.mesh.position.y = u.pos.y + Math.sin(t * 2) * 0.08;
+      if (Math.abs(p.x - u.pos.x) < 1.2 && Math.abs(p.z - u.pos.z) < 1.2 && Math.abs(p.y - 0.2 - u.pos.y) < 1.6) { this.hideUpgrade(u.id); game.grantUpgrade(u.id); }
     }
     if (p.y < this.killY) { game.respawn(); return; }
     for (const k of this.kills) {

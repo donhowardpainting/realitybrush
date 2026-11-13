@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Physics, RAPIER, WORLD_GROUPS } from '../core/physics';
+import { Physics, RAPIER, WORLD_GROUPS, QUERY_WORLD } from '../core/physics';
 import { Paint, PAINTS } from './types';
 
 /** Shared animated time uniform used by every world shader. */
@@ -242,7 +242,7 @@ export class Paintable {
   }
 
   /** Stamp an irregular blob of `type` centred on a local-space point. Wraps around edges. */
-  stamp(lp: THREE.Vector3, r: number, type: Paint, seed = 0): number {
+  stamp(lp: THREE.Vector3, r: number, type: Paint, seed = 0, facing?: THREE.Vector3): number {
     if (this.resist) return 0;
     this.ensureGrid();
     const N = this.N, W = 3 * N;
@@ -257,6 +257,8 @@ export class Paintable {
       for (let s = 0; s < 2; s++) {
         const d = Math.abs((s ? -1 : 1) * this.halfArr[axis] - l[axis]);
         if (d >= r) continue;
+        // when spilling onto a neighbour, only faces that look the same way as the surface hit
+        if (facing && (s ? -1 : 1) * (axis === 0 ? facing.x : axis === 1 ? facing.y : facing.z) < 0.5) continue;
         const rf = Math.sqrt(r * r - d * d);
         const cu = l[ua], cv = l[va];
         const ext = rf * 1.35;
@@ -391,6 +393,8 @@ export class Paintable {
 const _lp = new THREE.Vector3();
 const _ln = new THREE.Vector3();
 
+const IDENT = { x: 0, y: 0, z: 0, w: 1 };
+const _sl = new THREE.Vector3(), _sn = new THREE.Vector3();
 interface Spread { p: Paintable; lp: THREE.Vector3; type: Paint; r: number; seed: number; t: number; stage: number }
 const SPREAD_T = [0, 0.06, 0.15];
 const SPREAD_R = [0.55, 0.82, 1.0];
@@ -404,6 +408,7 @@ export class PaintWorld {
   private spreads: Spread[] = [];
   private dirty = new Set<Paintable>();
   splatCount = 0;
+  private ball = new RAPIER.Ball(0.5);
 
   constructor(private physics: Physics, private scene: THREE.Scene) {}
 
@@ -443,6 +448,15 @@ export class PaintWorld {
     }
     this.dirty.add(p);
     this.splatCount++;
+    // spill across seams: neighbouring surfaces within reach take their share of the same blob
+    this.ball.radius = radius;
+    this.physics.world.intersectionsWithShape(point, IDENT, this.ball, (c) => {
+      const q = this.byCollider.get(c.handle);
+      if (q && q !== p && !q.resist) {
+        if (q.stamp(q.worldToLocal(point, _sl), radius, type, seed, q.dirToLocal(normal, _sn))) this.dirty.add(q);
+      }
+      return true;
+    }, RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, QUERY_WORLD);
     const ev: SplatEvent = { p, type, point, normal, local: lp, radius };
     for (const l of this.listeners) l(ev);
     return true;

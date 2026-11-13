@@ -37,7 +37,12 @@ you are using.
 
 `R` returns to the last checkpoint (also in the pause menu). The paint bomb throws one large
 splash of the selected pigment on a short cooldown. A diamond marker points at the current
-objective, and nine optional echo shards are hidden where a little creative painting gets you.
+objective.
+
+There is plenty to find off the main path: sixteen echo shards, eleven field-note terminals that
+fill in what happened here, and three sealed vaults. Each vault opens for one pigment — usually
+one you only earn after you have walked past it — and holds a permanent brush upgrade (wider
+splats, faster paint bombs, a stronger pulse). Everything found is listed in the pause menu.
 
 The story runs through three connected districts — the Research Courtyard, the Machine Works and
 the Gravity Tower — with checkpoints and automatic saving (localStorage). The **Sandbox** on the
@@ -68,7 +73,7 @@ npm run build && npm test          # all gameplay tests
 npm test -- ice                    # only tests whose name contains "ice"
 ```
 
-`tests/run.mjs` drives the real game headlessly (Playwright + Chromium, software WebGL). Twenty-four
+`tests/run.mjs` drives the real game headlessly (Playwright + Chromium, software WebGL). Twenty-five
 tests assert that each pigment changes behaviour, that combinations work (float + mag-line,
 growth + bounce, float + pulse, stacking), that every gate of the story can be passed, and that
 checkpoints, respawning, save/continue and restart function. Gamepad input is driven through a

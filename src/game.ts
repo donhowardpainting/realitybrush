@@ -124,6 +124,7 @@ export class Game {
       this.level.restoreState(this.seen);
       for (const p of this.unlockedStory) this.zones.removePickup(p);
       for (const sh of this.zones.shards) if (this.seen.has('shard:' + sh.i)) this.zones.hideShard(sh.i);
+      for (const u of this.zones.upgrades) if (this.seen.has('upgrade:' + u.id)) this.zones.hideUpgrade(u.id);
       this.storyCp = this.zones.checkpoints.find((c) => c.id === save.cp) ?? null;
       this.stage.restore = this.stage.restoreTarget = this.restoreLevel();
     }
@@ -151,7 +152,7 @@ export class Game {
   }
 
   emit(ev: string, data?: any) {
-    const persistent = /^(zone|pickup|power|socket|mass|finale|grow|shard)/.test(ev);
+    const persistent = /^(zone|pickup|power|socket|mass|finale|grow|shard|log|upgrade)/.test(ev);
     const first = persistent && !this.seen.has(ev);
     if (persistent && this.mode === 'story') this.seen.add(ev);
     for (const f of this.listeners.get(ev) ?? []) f(data);
@@ -248,6 +249,31 @@ export class Game {
     this.stage.pulse(0x7fffe8, 0.18);
     this.glow.burst(this.player.pos, null, new THREE.Color(0x7fffe8), 50, 6, 0.08, 1, -1, 1.6);
     this.hud.toast(`ECHO SHARD ${this.shardCount} / ${this.zones.shards.length}`, '#7fffe8');
+    this.hud.refreshShards();
+  }
+
+  private countSeen(prefix: string): number { let n = 0; for (const e of this.seen) if (e.startsWith(prefix)) n++; return n; }
+  get logCount(): number { return this.countSeen('log:'); }
+  get upgradeCount(): number { return this.countSeen('upgrade:'); }
+  hasUpgrade(id: string): boolean { return this.seen.has('upgrade:' + id); }
+
+  readLog(i: number) {
+    const lg = this.zones.logs[i];
+    const first = !this.seen.has('log:' + i);
+    this.emit('log:' + i);
+    if (first && this.mode === 'story') { this.audio.checkpoint(); this.hud.refreshShards(); }
+    this.hud.showLog(lg.title, lg.text);
+  }
+
+  grantUpgrade(id: string) {
+    const u = this.zones.upgrades.find((x) => x.id === id)!;
+    this.emit('upgrade:' + id);
+    this.audio.unlock();
+    this.input.rumble(0.8, 0.8, 220);
+    this.stage.pulse(0xffb43a, 0.3);
+    this.glow.burst(this.player.pos, null, new THREE.Color(0xffb43a), 80, 8, 0.09, 1.2, 1, 1.8);
+    this.hud.toast(`BRUSH UPGRADE — ${u.name}`, '#ffb43a');
+    this.hud.hint(u.desc, 8);
     this.hud.refreshShards();
   }
 
@@ -427,7 +453,7 @@ export class Game {
         this.state = 'ending';
         this.touchUi.show(false);
         this.input.unlock();
-        this.hud.showEnding({ time: this.playTime, splats: this.paint.splatCount, bounces: this.player.stats.bounces, shards: this.shardCount, shardTotal: this.zones.shards.length });
+        this.hud.showEnding({ time: this.playTime, splats: this.paint.splatCount, bounces: this.player.stats.bounces, shards: this.shardCount, shardTotal: this.zones.shards.length, logs: this.logCount, logTotal: this.zones.logs.length, upgrades: this.upgradeCount });
         document.getElementById('menu')!.classList.remove('hidden');
       }
     }

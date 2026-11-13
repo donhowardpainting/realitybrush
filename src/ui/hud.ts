@@ -48,6 +48,7 @@ export class Hud {
   private titleTimer = 0;
   private lastObjective = '';
   private tags = '';
+  private logTimer = 0;
   private aim = '';
   private aimT = 0;
   private dir = new THREE.Vector3();
@@ -132,6 +133,7 @@ export class Hud {
   update(dt: number) {
     if (this.hintTimer > 0 && (this.hintTimer -= dt) <= 0) $('hint').classList.remove('show');
     if (this.titleTimer > 0 && (this.titleTimer -= dt) <= 0) $('title-card').classList.remove('show');
+    if (this.logTimer > 0 && (this.logTimer -= dt) <= 0) $('log-card').classList.remove('show');
     const pl = this.game.player;
     $('crosshair').classList.toggle('fire', this.game.input.down('Mouse0'));
     this.updateWaypoint();
@@ -170,11 +172,20 @@ export class Hud {
     return '';
   }
 
+  showLog(title: string, text: string) {
+    const c = $('log-card');
+    c.querySelector('b')!.textContent = title;
+    c.querySelector('p')!.textContent = text;
+    c.classList.add('show');
+    this.logTimer = 14;
+  }
+  hideLog() { $('log-card').classList.remove('show'); this.logTimer = 0; }
+
   refreshShards() {
     const g = this.game, el = $('shards');
-    const n = g.shardCount;
-    el.classList.toggle('hidden', g.mode !== 'story' || n === 0);
-    el.textContent = `◆ ${n} / ${g.zones.shards.length}`;
+    const n = g.shardCount, l = g.logCount, u = g.upgradeCount;
+    el.classList.toggle('hidden', g.mode !== 'story' || n + l + u === 0);
+    el.textContent = `◆ ${n}/${g.zones.shards.length}   ▤ ${l}/${g.zones.logs.length}   ✦ ${u}/${g.zones.upgrades.length}`;
   }
 
   /** Objective marker: a diamond pinned to the goal, clamped to the screen edge when off-view. */
@@ -258,6 +269,16 @@ export class Hud {
     }
     b.appendChild(this.btn('Restart story', 'Erases progress', 'var(--red)', () => g.start('new')));
     m.querySelector('.menu-inner')!.appendChild(this.settings());
+    // everything found so far, readable again
+    const notes = g.zones.logs.filter((l) => g.seen.has('log:' + l.i));
+    const ups = g.zones.upgrades.filter((u) => g.seen.has('upgrade:' + u.id));
+    if (g.mode === 'story' && notes.length + ups.length > 0) {
+      const d = document.createElement('details');
+      d.className = 'notes';
+      d.innerHTML = `<summary>Finds — ${g.shardCount}/${g.zones.shards.length} shards · ${notes.length}/${g.zones.logs.length} notes · ${ups.length}/${g.zones.upgrades.length} upgrades</summary>`
+        + ups.map((u) => `<p><b>✦ ${u.name}</b>${u.desc}</p>`).join('') + notes.map((l) => `<p><b>${l.title}</b>${l.text}</p>`).join('');
+      m.querySelector('.menu-inner')!.appendChild(d);
+    }
   }
 
   showClick(text: string, fn: () => void) {
@@ -267,13 +288,13 @@ export class Hud {
     m.querySelector('.btns')!.appendChild(this.btn('Begin', '', 'var(--purple)', fn));
   }
 
-  showEnding(stats: { time: number; splats: number; bounces: number; shards: number; shardTotal: number }) {
+  showEnding(stats: { time: number; splats: number; bounces: number; shards: number; shardTotal: number; logs: number; logTotal: number; upgrades: number }) {
     const g = this.game, m = $('menu');
     const mm = Math.floor(stats.time / 60), ss = Math.floor(stats.time % 60);
     m.className = 'center ending';
     m.innerHTML = `<div class="menu-inner"><h1 class="logo">REALITY <span>REWRITTEN</span></h1>
       <p class="lead">The gravity core is singing again. Colour is pouring back into the city, street by street — and the brush is still warm in your hands.</p>
-      <div class="stats"><div><b>${mm}:${String(ss).padStart(2, '0')}</b>Time</div><div><b>${stats.splats}</b>Splats</div><div><b>${stats.bounces}</b>Bounces</div><div><b>${stats.shards}/${stats.shardTotal}</b>Echo shards</div></div>
+      <div class="stats"><div><b>${mm}:${String(ss).padStart(2, '0')}</b>Time</div><div><b>${stats.splats}</b>Splats</div><div><b>${stats.bounces}</b>Bounces</div><div><b>${stats.shards}/${stats.shardTotal}</b>Echo shards</div><div><b>${stats.logs}/${stats.logTotal}</b>Field notes</div><div><b>${stats.upgrades}/3</b>Upgrades</div></div>
       <div class="btns"></div></div>`;
     const b = m.querySelector('.btns')!;
     b.appendChild(this.btn('Keep exploring', 'The world stays painted', 'var(--green)', () => g.resume()));

@@ -53,6 +53,27 @@ function gearGeo(r: number, depth: number, teeth: number): THREE.BufferGeometry 
   return prep(g, 0.8);
 }
 
+/**
+ * A sealed kiosk whose door answers to one pigment. Front faces +Z. Returns its interior centre.
+ */
+function vault(b: Builder, id: string, x0: number, z1: number, y0: number, need: Paint, label: string): THREE.Vector3 {
+  const x1 = x0 + 5, z0 = z1 - 4, h = 3.2, t = 0.3;
+  b.box(x0, x1, y0, y0 + h, z0, z0 + t, 'concrete');
+  b.box(x0, x0 + t, y0, y0 + h, z0 + t, z1 - t, 'concrete');
+  b.box(x1 - t, x1, y0, y0 + h, z0 + t, z1 - t, 'concrete');
+  b.box(x0 - 0.15, x1 + 0.15, y0 + h, y0 + h + 0.25, z0 - 0.15, z1 + 0.15, 'rust');
+  b.box(x0, x0 + 0.6, y0, y0 + h, z1 - t, z1, 'concrete');
+  b.box(x0 + 2.2, x1, y0, y0 + h, z1 - t, z1, 'concrete');
+  b.box(x0 + 0.6, x0 + 2.2, y0 + 2.4, y0 + h, z1 - t, z1, 'concrete');
+  const door = b.kin(x0 + 1.4, y0 + 1.2, z1 - t / 2, 1.6, 2.4, 0.2, 'hazard');
+  const r = b.receptor(id, x0 + 3.6, y0 + 1.45, z1, 'z+', label, need);
+  b.mover(door, V(x0 + 3.05, y0 + 1.2, z1 - t / 2), 1.6, 'hold', () => r.on, 0, true);
+  b.dbox(x0 + 0.5, x0 + 0.6, y0, y0 + 2.5, z1, z1 + 0.06, b.glowKey(PAINTS[need].hex, 1.6));
+  b.dbox(x0 + 2.2, x0 + 2.3, y0, y0 + 2.5, z1, z1 + 0.06, b.glowKey(PAINTS[need].hex, 1.6));
+  b.lamp(x0 + 2.5, y0 + 2.7, z0 + 2, PAINTS[need].hex, 3, 7, 0.1);
+  return V(x0 + 2.5, y0, z0 + 2);
+}
+
 export function buildWorld(game: Game, b: Builder): LevelDef {
   const { stage, zones, power, physics, mats } = game;
   const scene = stage.scene;
@@ -193,7 +214,9 @@ export function buildWorld(game: Game, b: Builder): LevelDef {
   b.dbox(-3, 3.2, 0, 0.6, -39.2, -33.5, 'concrete', true, [0.12, 0.3, 0.05]);
   b.rubble(1, 0, -36, 12, 2.6, 'concrete', 0.6);
   b.box(-5, 5, 0, 3, -49.5, -40.5, 'brick');
-  b.dbox(-5.2, 5.2, 2.8, 3, -49.7, -40.3, 'concrete');
+  // roof trim as a band *around* the roof, below its top: a slab flush with the paintable roof z-fights
+  b.dbox(-5.25, -5, 2.55, 2.9, -49.75, -40.25, 'concrete'); b.dbox(5, 5.25, 2.55, 2.9, -49.75, -40.25, 'concrete');
+  b.dbox(-5, 5, 2.55, 2.9, -40.5, -40.25, 'concrete'); b.dbox(-5, 5, 2.55, 2.9, -49.75, -49.5, 'concrete');
   b.dbox(-1, 1, 0, 2.2, -40.45, -40.3, 'dark'); b.wallLamp(0, 2.5, -40.4, 'z+', 0xffd21f, 1.6, 7);
   b.sign(['SUBSTATION 4', 'ROOF RATED FOR IMPACT TESTING'], 3, 1.6, -40.4, 'z+', 2.6, 0.9, '#ffd21f');
   b.wall(-14, 14, 0, 6.5, -60, -51, 'concrete', ['z+'], { windows: false });
@@ -271,7 +294,7 @@ export function buildWorld(game: Game, b: Builder): LevelDef {
   // emergency lighting until the bus comes up
   for (const [x, z] of [[-19.9, -121], [-19.9, -134], [-19.9, -158], [19.9, -125], [19.9, -155], [19.9, -146]]) b.wallLamp(x, 4.5, z, x < 0 ? 'x+' : 'x-', 0xff4030, 4.5, 16);
   b.wallLamp(0, 6.5, -113.5, 'z-', 0xff4030, 4.5, 16);
-  for (const [x, z] of [[-8, -160.1], [0, -160.1], [16, -160.1]]) b.wallLamp(x, 7, z, 'z+', 0xffb070, 3, 12);
+  for (const [x, z] of [[-13, -160.1], [0, -160.1], [16, -160.1]]) b.wallLamp(x, 7, z, 'z+', 0xffb070, 3, 12);
   b.lamp(-11, 5.6, -158.6, 0xffa040, 3.5, 12, 0); b.lamp(-6.6, 3.4, -118.4, 0xff5040, 2.5, 9, 0); b.lamp(7, 6.6, -142.6, 0xffc890, 3, 12, 0.12);
   const hallLights = [V(-8, 14, -128), V(8, 14, -140), V(-6, 14, -156)].map((p) => {
     const l = new THREE.PointLight(0xffe2b8, 0, 46, 1.4); l.position.copy(p); scene.add(l);
@@ -342,7 +365,7 @@ export function buildWorld(game: Game, b: Builder): LevelDef {
   b.box(-20, 4, 7.4, 8, -168, -160, 'steel');
   for (const x of [-18, -12, -2, 3.6]) b.column(x, -160.4, 0, 7.4, 0.5, 'rust');
   b.railing(-20, -160.1, -10.2, -160.1, 8); b.railing(-3.8, -160.1, 4, -160.1, 8);
-  b.box(-10, -4, 0, 8, -160.6, -160, 'moss', { fertile: 'vine' });
+  b.box(-10, -4, 0, 8, -160, -159.4, 'moss', { fertile: 'vine' });
   b.sign(['FERTILE SUBSTRATE', 'RESPONDS TO GREEN'], -7, 9.2, -167.9, 'z+', 3.4, 1, '#4cff62');
   const hallBed = b.box(-2, 3.6, 0, 0.3, -158.6, -154, 'soil', { fertile: 'stalk' });
   hallBed.data.growMax = 6.7;
@@ -401,8 +424,8 @@ export function buildWorld(game: Game, b: Builder): LevelDef {
   b.dbox(-18, -14, 19, 20.6, -160, -156, 'panel', true); b.dbox(6, 9, 19, 20.3, -120, -117, 'panel', true); b.dbox(-6, -3.5, 19, 20.8, -140, -137, 'rust', true);
   b.pipeRun([[-16, 19.4, -156], [-16, 19.4, -130], [-10, 19.4, -130]], 0.18);
   b.pipe(V(16, 19, -118), V(16, 27, -118), 0.06, 'dark', false, 5); b.lamp(16, 27.2, -118, 0xff3030, 1.2, 6, 0.1);
-  b.box(-2, 2, 18.4, 19, -189, -169.5, 'steel');
-  b.railing(-1.9, -169.4, -1.9, -188.9, 19); b.railing(1.9, -169.4, 1.9, -188.9, 19);
+  b.box(-2, 2, 18.4, 19, -187.5, -169.5, 'steel');
+  b.railing(-1.9, -169.4, -1.9, -187.6, 19); b.railing(1.9, -169.4, 1.9, -187.6, 19);
   for (const z of [-174, -180, -186]) b.dbox(-2.3, 2.3, 18.1, 18.4, z - 0.15, z + 0.15, 'rust');
   b.cable(V(-2, 19, -170), V(-2, 34, -187.5), -1, 0.05); b.cable(V(2, 19, -170), V(2, 34, -187.5), -1, 0.05);
   zones.addCheckpoint('roof', 12, 19, -161, Math.PI / 2, 'Works Roof');
@@ -573,6 +596,41 @@ export function buildWorld(game: Game, b: Builder): LevelDef {
     [8.5, 20, -200],       // east side of the tower base
   ]) zones.addShard(x, y, z);
 
+  // seven more shards for the thorough
+  for (const [x, y, z] of [
+    [-3.5, 1.5, 18.4],     // on the lab desk — the first one is a gift
+    [-19, 9, -28.5],       // far end of the walkway
+    [-19, 9, -166],        // west end of the upper deck
+    [-10, 28.5, -210],     // dark corner of the west gallery
+    [10.6, 37, -208.2],    // top of the moss buttress
+    [-2.6, 46, -202],      // behind the core
+  ]) zones.addShard(x, y, z);
+
+  /* ---- sealed vaults: each answers to one pigment, and each needs a trip back ---- */
+  const vA = vault(b, 'vaultA', 8, -34.5, 0, Paint.Blue, 'COLD STORE');
+  zones.addUpgrade('nozzle', vA.x - 0.9, 1.2, vA.z, 'WIDE NOZZLE', 'Every splat now lands 30% wider.');
+  const vB = vault(b, 'vaultB', 13.5, -123, 0, Paint.Green, 'SEED VAULT');
+  zones.addUpgrade('capacitor', vB.x - 0.9, 1.2, vB.z, 'BOMB CAPACITOR', 'Paint bombs recharge twice as fast.');
+  zones.addShard(vB.x + 1.2, 1, vB.z);
+  const vC = vault(b, 'vaultC', -11, -158, 19, Paint.Yellow, 'IMPACT LOCKER');
+  zones.addUpgrade('amplifier', vC.x - 0.9, 20.2, vC.z, 'PULSE AMPLIFIER', 'The kinetic pulse hits much harder and recovers sooner.');
+
+  /* ---- field notes ---- */
+  const NOTES: [number, number, number, string, string][] = [
+    [-3.6, 0, 12.4, 'NOTE 01 — PROTOTYPE 07', 'It does not colour things. It edits them. Purple told a four-tonne mass it weighed nothing, and the mass believed it.'],
+    [6.5, 0, -6, 'NOTE 02 — LOAD-LOCKED', 'The crane clamps only open at zero weight. Nobody thought that could happen by accident. Nobody thought it could happen at all.'],
+    [-6, 8, -28.8, 'NOTE 03 — ELASTIC', 'Yellow stores whatever hits it. Fall further, fly further. Walls work too, if you arrive fast enough.'],
+    [-11, 0, -48, 'NOTE 04 — COLD STORE', 'The kiosk across the breach only answers to blue. Whoever sealed it wanted the wide nozzle kept out of the wrong hands.'],
+    [-8, 0, -104, 'NOTE 05 — THE WORKS', 'Red is not a colour here, it is current. Any plate marked for it will drink until its machine wakes.'],
+    [-6.5, 0, -157, 'NOTE 06 — MAG-LINE', 'The line drags whatever sits in its field. Weightless things included — that is how the night shift moved the heavy cores.'],
+    [33, 0, -141, 'NOTE 07 — SPECIMEN 12', 'Green only wakes what is already alive: moss, soil. Feed a stalk and it keeps climbing. The seed vault in the hall opens the same way.'],
+    [4, 19, -166, 'NOTE 08 — ROOF', 'The impact locker up here wants yellow. And the tower… the tower never shut down. It has been holding the sky up on its own.'],
+    [9.5, 19, -190.2, 'NOTE 09 — GRAVITY TOWER', 'One floating slab hovers above whatever is under it. So put another slab under it. We climbed the whole shaft that way.'],
+    [vA.x + 1.2, 0, vA.z - 0.9, 'NOTE 10 — SEALED', 'If you are reading this you came back with blue. Good. Sixteen shards of the first test are still scattered across the site.'],
+    [vC.x + 1.2, 19, vC.z - 0.9, 'NOTE 11 — LAST ENTRY', 'Five locks on the core, one for each pigment. Paint them all and the city gets its colour back. We ran out of time. You have the brush.'],
+  ];
+  for (const [x, y, z, title, text] of NOTES) zones.addLog(x, y, z, title, text);
+
   const sandbox = buildSandbox(game, b);
 
   /* ---- per-frame world animation ---- */
@@ -661,12 +719,8 @@ export function buildWorld(game: Game, b: Builder): LevelDef {
     },
     restoreState(seen) {
       const on = (id: string) => { const r = power.receptor(id); r.p.fill(r.need); r.powered = true; game.paint.markDirty(r.p); };
-      if (seen.has('power:door')) on('door');
-      if (seen.has('power:belts')) on('belts');
+      for (const r of power.receptors) if (!r.id.startsWith('lock') && seen.has('power:' + r.id)) on(r.id);
       if (seen.has('socket:core')) socket.force(game, core);
-      if (seen.has('power:elevator')) on('elevator');
-      if (seen.has('power:rail')) on('rail');
-      if (seen.has('power:rotor')) on('rotor');
       if (seen.has('finale')) { finaleFired = true; for (let i = 0; i < 5; i++) on('lock' + i); }
     },
     frame,

@@ -30,7 +30,8 @@ export class Gun {
   private pulseCool = 0;
   private bombCool = 0;
   /** 0..1, 1 = paint bomb ready. */
-  get bombReady() { return 1 - Math.max(0, this.bombCool) / BOMB_COOLDOWN; }
+  private bombMax = BOMB_COOLDOWN;
+  get bombReady() { return 1 - Math.max(0, this.bombCool) / this.bombMax; }
   private recoil = 0;
   private recoilV = 0;
   private swayX = 0;
@@ -217,7 +218,7 @@ export class Gun {
     if (!g) return;
     const origin = _p, dir = _s;
     this.aim(dir, origin);
-    this.bombCool = BOMB_COOLDOWN;
+    this.bombCool = this.bombMax = game.hasUpgrade('capacitor') ? BOMB_COOLDOWN * 0.5 : BOMB_COOLDOWN;
     g.alive = true; g.type = this.selected; g.age = 0; g.size = 0.17; g.big = true;
     g.p.copy(origin);
     g.v.copy(dir).multiplyScalar(30).addScaledVector(game.player.vel, 0.35);
@@ -267,7 +268,7 @@ export class Gun {
     const c = PAINTS[g.type].color;
     const pt = _hitP.copy(point), nm = _hitN.copy(normal);
     let stuck = false;
-    if (p) stuck = game.paint.splat(p, pt, nm, g.type, g.big ? BOMB_RADIUS : SPLAT_RADIUS * (0.9 + Math.random() * 0.25));
+    if (p) stuck = game.paint.splat(p, pt, nm, g.type, (g.big ? BOMB_RADIUS : SPLAT_RADIUS * (0.9 + Math.random() * 0.25)) * (game.hasUpgrade('nozzle') ? 1.3 : 1));
     if (g.big) {
       game.audio.splat(g.type, 1.6);
       game.drops.burst(pt, nm, c, 40, 8, 0.08, 0.8, 12);
@@ -305,7 +306,8 @@ export class Gun {
   /** Kinetic pulse: a shove of compressed air. Moves objects, nudges you when airborne. */
   private pulse() {
     const game = this.game, pl = game.player;
-    this.pulseCool = 0.65;
+    const amp = game.hasUpgrade('amplifier');
+    this.pulseCool = amp ? 0.4 : 0.65;
     this.recoilV += 9;
     game.audio.pulse();
     pl.forward(_d);
@@ -320,7 +322,7 @@ export class Gun {
       _p.normalize();
       if (_p.dot(_d) < 0.72 && dist > 2.2) continue;
       const m = Math.min(p.body.mass(), 320);
-      const k = m * 8.5 * (1 - (dist / reach) * 0.6);
+      const k = m * (amp ? 13.5 : 8.5) * (1 - (dist / reach) * 0.6);
       p.body.applyImpulse({ x: _d.x * k, y: _d.y * k + m * 0.8, z: _d.z * k }, true);
     }
     if (!pl.grounded) pl.vel.addScaledVector(_d, -3.2);
