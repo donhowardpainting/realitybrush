@@ -25,7 +25,7 @@ export class Particles {
         attribute vec4 pcolor; attribute float psize; uniform float uScale; varying vec4 vC;
         void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); float d = -mv.z; vC = pcolor; vC.a *= smoothstep(0.25, 1.6, d); gl_PointSize = min(psize * uScale / max(d, 0.2), uScale * 0.05); gl_Position = projectionMatrix * mv; }`,
       fragmentShader: additive
-        ? 'varying vec4 vC; void main(){ float r = length(gl_PointCoord - 0.5); float a = smoothstep(0.5, 0.05, r); gl_FragColor = vec4(vC.rgb * a * vC.a, 1.0); }'
+        ? 'varying vec4 vC; void main(){ float r = length(gl_PointCoord - 0.5); float a = smoothstep(0.5, 0.05, r); gl_FragColor = vec4(max(vC.rgb * a * vC.a, 0.0), 1.0); }'
         : 'varying vec4 vC; void main(){ float r = length(gl_PointCoord - 0.5); if (r > 0.5) discard; float a = smoothstep(0.5, 0.35, r) * vC.a; gl_FragColor = vec4(vC.rgb * (1.0 - r * 0.6), a); }',
       blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending,
       depthWrite: false, transparent: true, fog: false,

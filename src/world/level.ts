@@ -9,7 +9,7 @@ import { timeUniform } from '../paint/paintable';
 import { buildSandbox } from './sandbox';
 
 export interface LevelDef {
-  objectives: { until: string; text: string; color?: string; hint?: string }[];
+  objectives: { until: string; text: string; color?: string; hint?: string; at?: [number, number, number] }[];
   restoreAt: Record<string, number>;
   titles: Record<string, [string, string]>;
   restoreState(seen: Set<string>): void;
@@ -439,7 +439,7 @@ export function buildWorld(game: Game, b: Builder): LevelDef {
     fragmentShader: `varying vec2 vUv; varying vec3 vN; varying vec3 vV; uniform float uTime; uniform float uPower;
       float h(vec2 p){ return fract(sin(dot(p, vec2(41.3, 289.1))) * 43758.5); }
       float n(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f); return mix(mix(h(i), h(i+vec2(1,0)), f.x), mix(h(i+vec2(0,1)), h(i+vec2(1,1)), f.x), f.y); }
-      void main(){ float rim = pow(abs(dot(normalize(vN), normalize(vV))), 1.5);
+      void main(){ float rim = pow(clamp(abs(dot(normalize(vN), normalize(vV))), 0.0, 1.0), 1.5);
         float s = n(vec2(vUv.x * 12.0, vUv.y * 60.0 - uTime * 3.0)) * 0.6 + n(vec2(vUv.x * 30.0 + uTime, vUv.y * 140.0 - uTime * 6.0)) * 0.4;
         vec3 c = mix(vec3(0.45, 0.2, 1.0), vec3(0.75, 0.9, 1.0), s * rim);
         gl_FragColor = vec4(c * rim * (0.35 + s) * uPower, 1.0); }`,
@@ -560,6 +560,19 @@ export function buildWorld(game: Game, b: Builder): LevelDef {
     sky.frustumCulled = false; scene.add(sky);
   }
 
+  /* ---- echo shards: optional finds that reward creative painting ---- */
+  for (const [x, y, z] of [
+    [-9, 3.7, 0],          // top of the dry fountain
+    [-17, 1, -28.4],       // back of the arcade
+    [10.5, 11.3, -55.5],   // on a pump-house tank
+    [-12, 1, -34],         // rubble in the breach
+    [10.7, 2.5, -110.5],   // plaza switchgear
+    [7, 7.2, -147],        // top of the gear block
+    [34.5, 6.9, -129.8],   // greenhouse specimen ledge
+    [-16, 21.5, -158],     // roof plant
+    [8.5, 20, -200],       // east side of the tower base
+  ]) zones.addShard(x, y, z);
+
   const sandbox = buildSandbox(game, b);
 
   /* ---- per-frame world animation ---- */
@@ -615,27 +628,27 @@ export function buildWorld(game: Game, b: Builder): LevelDef {
 
   return {
     objectives: [
-      { until: 'zone:courtyard', text: 'Leave the lab.', color: css(Paint.Purple) },
-      { until: 'mass:float', text: 'Climb onto the suspended test mass — then paint it.', color: css(Paint.Purple), hint: 'Hold <kbd>LMB</kbd> to spray. PURPLE cancels the weight of whatever it covers.' },
-      { until: 'zone:balcony', text: 'Ride the weightless mass up to the walkway.', color: css(Paint.Purple), hint: 'Stand on it and keep painting — more purple, more lift. <kbd>Q</kbd> SOLVENT strips paint.' },
-      { until: 'pickup:yellow', text: 'Take the YELLOW pigment.', color: css(Paint.Yellow) },
-      { until: 'zone:pumproof', text: 'Reach the pump-house roof across the breach.', color: css(Paint.Yellow), hint: '<kbd>4</kbd> YELLOW turns a surface into a spring. Paint the roof below, then drop onto it. Hold <kbd>Space</kbd> to bounce higher.' },
-      { until: 'pickup:blue', text: 'Take the BLUE pigment.', color: css(Paint.Blue) },
-      { until: 'zone:plaza', text: 'Clear the canal.', color: css(Paint.Blue), hint: '<kbd>2</kbd> BLUE removes friction. Ice the whole chute and the ramp at its end — then let gravity build your speed.' },
-      { until: 'pickup:red', text: 'Take the RED pigment.', color: css(Paint.Red) },
-      { until: 'power:door', text: 'Energise the blast door.', color: css(Paint.Red), hint: '<kbd>5</kbd> RED is raw energy. Cover a receptor plate to power its machine.' },
-      { until: 'socket:core', text: 'Get the power core into its socket at the end of the line.', color: css(Paint.Red), hint: 'The core is far too heavy to push — and something is blocking the line.' },
-      { until: 'pickup:green', text: 'The bus is live. Recover the GREEN pigment from the greenhouse.', color: css(Paint.Green) },
-      { until: 'zone:deck', text: 'Reach the upper deck of the hall.', color: css(Paint.Green), hint: '<kbd>3</kbd> GREEN wakes fertile matter. Moss grows climbable ivy where you paint; soil raises a stalk — keep feeding it.' },
-      { until: 'power:elevator', text: 'Cross the stampers and energise the freight lift.', color: css(Paint.Red) },
-      { until: 'zone:roof', text: 'Ride the lift to the roof.', color: '#ffffff' },
-      { until: 'zone:tower', text: 'Cross the bridge into the Gravity Tower.', color: css(Paint.Purple) },
-      { until: 'zone:w1', text: 'Climb to the west gallery.', color: css(Paint.Purple), hint: 'A painted slab hovers above whatever is beneath it — including another slab. One alone will not reach.' },
-      { until: 'zone:n1', text: 'Cross the void to the north gallery.', color: css(Paint.Red), hint: 'Float the rider plate, stand on it, then energise the mag-rail.' },
-      { until: 'zone:n2', text: 'Scale the moss buttress.', color: css(Paint.Green) },
-      { until: 'zone:e1', text: 'Reach the east gallery, high above.', color: css(Paint.Yellow), hint: 'A stalk will not reach on its own. Its cap takes paint like anything else.' },
-      { until: 'zone:hub', text: 'Reach the core at the heart of the tower.', color: css(Paint.Red), hint: 'Energise the rotor and ride an arm across.' },
-      { until: 'finale', text: 'Open the spectrum lock: paint each plate its own colour.', color: '#ffffff' },
+      { until: 'zone:courtyard', at: [0, 1.6, 6], text: 'Leave the lab.', color: css(Paint.Purple) },
+      { until: 'mass:float', at: [0, 1.8, -11.9], text: 'Climb onto the suspended test mass — then paint it.', color: css(Paint.Purple), hint: 'Hold <kbd>LMB</kbd> to spray. PURPLE cancels the weight of whatever it covers.' },
+      { until: 'zone:balcony', at: [0, 9.2, -18], text: 'Ride the weightless mass up to the walkway.', color: css(Paint.Purple), hint: 'Stand on it and keep painting — more purple, more lift. <kbd>Q</kbd> SOLVENT strips paint.' },
+      { until: 'pickup:yellow', at: [0, 9.3, -27.5], text: 'Take the YELLOW pigment.', color: css(Paint.Yellow) },
+      { until: 'zone:pumproof', at: [0, 7.8, -53], text: 'Reach the pump-house roof across the breach.', color: css(Paint.Yellow), hint: '<kbd>4</kbd> YELLOW turns a surface into a spring. Paint the roof below, then drop onto it. Hold <kbd>Space</kbd> to bounce higher.' },
+      { until: 'pickup:blue', at: [0, 7.8, -57.2], text: 'Take the BLUE pigment.', color: css(Paint.Blue) },
+      { until: 'zone:plaza', at: [0, 1.4, -98.5], text: 'Clear the canal.', color: css(Paint.Blue), hint: '<kbd>2</kbd> BLUE removes friction. Ice the whole chute and the ramp at its end — then let gravity build your speed.' },
+      { until: 'pickup:red', at: [0, 1.3, -103.5], text: 'Take the RED pigment.', color: css(Paint.Red) },
+      { until: 'power:door', at: [5.4, 1.7, -111.8], text: 'Energise the blast door.', color: css(Paint.Red), hint: '<kbd>5</kbd> RED is raw energy. Cover a receptor plate to power its machine.' },
+      { until: 'socket:core', at: [-11, 3, -158.6], text: 'Get the power core into its socket at the end of the line.', color: css(Paint.Red), hint: 'The core is far too heavy to push — and something is blocking the line.' },
+      { until: 'pickup:green', at: [30, 1.3, -139], text: 'The bus is live. Recover the GREEN pigment from the greenhouse.', color: css(Paint.Green) },
+      { until: 'zone:deck', at: [-7, 9.2, -164], text: 'Reach the upper deck of the hall.', color: css(Paint.Green), hint: '<kbd>3</kbd> GREEN wakes fertile matter. Moss grows climbable ivy where you paint; soil raises a stalk — keep feeding it.' },
+      { until: 'power:elevator', at: [19.8, 9.8, -161.5], text: 'Cross the stampers and energise the freight lift.', color: css(Paint.Red) },
+      { until: 'zone:roof', at: [17.25, 20.2, -165.25], text: 'Ride the lift to the roof.', color: '#ffffff' },
+      { until: 'zone:tower', at: [0, 20.4, -190.5], text: 'Cross the bridge into the Gravity Tower.', color: css(Paint.Purple) },
+      { until: 'zone:w1', at: [-8.5, 28.7, -200], text: 'Climb to the west gallery.', color: css(Paint.Purple), hint: 'A painted slab hovers above whatever is beneath it — including another slab. One alone will not reach.' },
+      { until: 'zone:n1', at: [7, 28.7, -207], text: 'Cross the void to the north gallery.', color: css(Paint.Red), hint: 'Float the rider plate, stand on it, then energise the mag-rail.' },
+      { until: 'zone:n2', at: [8, 37.2, -209.3], text: 'Scale the moss buttress.', color: css(Paint.Green) },
+      { until: 'zone:e1', at: [9, 46.2, -199], text: 'Reach the east gallery, high above.', color: css(Paint.Yellow), hint: 'A stalk will not reach on its own. Its cap takes paint like anything else.' },
+      { until: 'zone:hub', at: [0, 46.2, -200], text: 'Reach the core at the heart of the tower.', color: css(Paint.Red), hint: 'Energise the rotor and ride an arm across.' },
+      { until: 'finale', at: [0, 47, -200], text: 'Open the spectrum lock: paint each plate its own colour.', color: '#ffffff' },
     ],
     restoreAt: {
       'mass:float': 0.08, 'zone:balcony': 0.14, 'zone:pumproof': 0.2, 'zone:plaza': 0.28, 'power:door': 0.34, 'socket:core': 0.48, 'pickup:green': 0.54,

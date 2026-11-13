@@ -132,12 +132,12 @@ export class Player {
 
     const fx = -Math.sin(this.yaw), fz = -Math.cos(this.yaw);
     const rx = Math.cos(this.yaw), rz = -Math.sin(this.yaw);
-    const iz = (inp.down('KeyW') || inp.down('ArrowUp') ? 1 : 0) - (inp.down('KeyS') || inp.down('ArrowDown') ? 1 : 0);
-    const ix = (inp.down('KeyD') || inp.down('ArrowRight') ? 1 : 0) - (inp.down('KeyA') || inp.down('ArrowLeft') ? 1 : 0);
+    const iz = inp.moveZ(), ix = inp.moveX();
     let wx = fx * iz + rx * ix, wz = fz * iz + rz * ix;
     const wl = Math.hypot(wx, wz);
     if (wl > 0) { wx /= wl; wz /= wl; }
-    const maxSp = inp.down('ShiftLeft') || inp.down('ShiftRight') ? SPRINT : WALK;
+    // analog sticks walk slowly when barely tilted
+    const maxSp = (inp.sprinting() ? SPRINT : WALK) * (wl > 0 ? Math.max(0.3, Math.min(1, wl)) : 1);
     const v = this.vel;
     const wasGrounded = this.grounded;
 
@@ -226,7 +226,7 @@ export class Player {
       const impact = wasGrounded ? 0 : -vyBefore;
       if (g2) { this.gNormal.copy(g2.normal); this.groundPaint = g2.paint; this.groundCollider = g2.collider; }
       if (!wasGrounded) {
-        if (impact > 3) { game.audio.land(impact); this.landDip = Math.min(0.22, impact * 0.012); }
+        if (impact > 3) { game.audio.land(impact); if (impact > 9) game.input.rumble(0.5, 0.2, 90); this.landDip = Math.min(0.22, impact * 0.012); }
         const b = g2?.collider.parent();
         if (b && g2) { ph.pointVelocity(b, g2.point, _b); v.x -= _b.x; v.z -= _b.z; }
       }
@@ -276,6 +276,7 @@ export class Player {
     this.grounded = false; this.coyote = 0; this.jumpBuf = 0;
     this.stats.bounces++;
     game.audio.bounce(sp);
+    game.input.rumble(0.7, 0.4, 140);
     game.glow.burst(g.point, n, PAINTS[Paint.Yellow].color, 26, 5, 0.09, 0.6, 4, 2);
     game.emit('player:bounce');
   }
@@ -354,8 +355,8 @@ export class Player {
       }
       return false;
     }
-    if (!this.climbing && !(iz > 0 || !this.grounded)) return false;
-    if (this.grounded && iz < 0) { this.climbing = false; return false; }
+    if (!this.climbing && !(iz > 0.3 || !this.grounded)) return false;
+    if (this.grounded && iz < -0.3) { this.climbing = false; return false; }
     this.climbing = true;
     this.grounded = false;
     const v = this.vel;
@@ -367,7 +368,7 @@ export class Player {
     }
     const tdot = rx * wn.x + rz * wn.z;
     const tx = rx - tdot * wn.x, tz = rz - tdot * wn.z;
-    if (!chest && feet && iz >= 0) v.set(-wn.x * 2.4, 3.6, -wn.z * 2.4);
+    if (!chest && feet && iz >= -0.1) v.set(-wn.x * 2.4, 3.6, -wn.z * 2.4);
     else v.set(tx * ix * 2.6 - wn.x * 1.5, iz * 3.4, tz * ix * 2.6 - wn.z * 1.5);
     this.ctl.disableSnapToGround();
     this.ctl.computeColliderMovement(this.collider, _a.set(v.x * dt, v.y * dt, v.z * dt), RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, QUERY_WORLD, this.filter);
@@ -393,7 +394,7 @@ export class Player {
     cam.rotation.set(this.pitch, this.yaw, this.camRoll);
     const targetKick = Math.min(1, Math.max(0, (sp - 7) / 12));
     this.fovKick += (targetKick - this.fovKick) * Math.min(1, dt * 5);
-    const fov = 78 + this.fovKick * 14;
+    const fov = this.game.stage.baseFov + this.fovKick * 12;
     if (Math.abs(cam.fov - fov) > 0.05) { cam.fov = fov; cam.updateProjectionMatrix(); }
     this.game.stage.speedFx = this.fovKick;
   }

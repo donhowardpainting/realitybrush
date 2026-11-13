@@ -371,6 +371,73 @@ const tests = {
     return { restore: r2(g.stage.restoreTarget) };
   },
 
+  async paint_bomb_covers_ground_fast() {
+    g.start('sandbox'); g.simulate(0.3);
+    at(300, 0, 10, 0, -0.45); g.simulate(0.2);
+    g.gun.select(P.blue);
+    const e = g.player.eye, f = g.player.forward(new V());
+    const hit = g.physics.castRay(e.x, e.y, e.z, f.x, f.y, f.z, 50).point.clone();
+    g.input.press('KeyE'); g.simulate(0.05); g.input.release('KeyE'); g.simulate(1.2);
+    let n = 0; for (const [dx, dz] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) if (surfaceAt(hit.x + dx, 0, hit.z + dz) === P.blue) n++;
+    check(n >= 4, 'one bomb should paint a pool over a metre across, painted probes: ' + n);
+    check(surfaceAt(hit.x + 3, 0, hit.z) === P.none, 'but it is still local');
+    check(g.gun.bombReady < 1, 'bomb goes on cooldown');
+    const before = g.paint.splatCount;
+    g.input.press('KeyE'); g.simulate(0.05); g.input.release('KeyE'); g.simulate(0.8);
+    check(g.paint.splatCount === before, 'cannot fire again during the cooldown');
+    g.simulate(2.5);
+    check(g.gun.bombReady >= 1, 'bomb recharges');
+    return { probes: n };
+  },
+
+  async gamepad_plays_the_game() {
+    g.start('sandbox'); g.simulate(0.3);
+    const btn = () => Array.from({ length: 17 }, () => ({ pressed: false, value: 0 }));
+    const pad = { connected: true, axes: [0, 0, 0, 0], buttons: btn() };
+    navigator.getGamepads = () => [pad];
+    const run = (s) => { for (let i = 0; i < Math.round(s * 60); i++) g.frame(1 / 60); };
+    at(300, 0, 16, 0, 0); run(0.2);
+    pad.axes = [0, -1, 0, 0]; run(1.5);
+    check(g.input.device === 'pad', 'device switches to pad');
+    check(g.player.pos.z < 10, 'left stick walks forward, z=' + g.player.pos.z);
+    pad.axes = [0, -0.45, 0, 0]; const z0 = g.player.pos.z; run(1);
+    const slow = z0 - g.player.pos.z;
+    check(slow > 1 && slow < 4.5, 'a half-tilted stick walks slowly, moved ' + slow);
+    pad.axes = [0, 0, 1, 0]; const yaw0 = g.player.yaw; run(0.5);
+    check(g.player.yaw < yaw0 - 0.6, 'right stick turns the view, d=' + (g.player.yaw - yaw0));
+    pad.axes = [0, 0, 0, 0];
+    pad.buttons[7] = { pressed: true, value: 1 }; run(0.5); pad.buttons[7] = { pressed: false, value: 0 }; run(0.1);
+    check(g.gun.shots >= 4, 'right trigger sprays, shots=' + g.gun.shots);
+    const sel = g.gun.selected;
+    pad.buttons[5] = { pressed: true, value: 1 }; run(0.05); pad.buttons[5] = { pressed: false, value: 0 }; run(0.05);
+    check(g.gun.selected !== sel, 'RB cycles pigment');
+    pad.buttons[0] = { pressed: true, value: 1 }; run(0.1); pad.buttons[0] = { pressed: false, value: 0 };
+    check(!g.player.grounded && g.player.vel.y > 0, 'A jumps');
+    run(1);
+    pad.buttons[9] = { pressed: true, value: 1 }; run(0.05); pad.buttons[9] = { pressed: false, value: 0 }; run(0.05);
+    check(g.state === 'paused', 'Start pauses, state=' + g.state);
+    // drive the pause menu: A on the first button resumes
+    pad.buttons[13] = { pressed: true, value: 1 }; run(0.05); pad.buttons[13] = { pressed: false, value: 0 }; run(0.05);
+    check(document.activeElement && document.activeElement.textContent.includes('Resume'), 'd-pad moves menu focus: ' + document.activeElement?.textContent);
+    pad.buttons[0] = { pressed: true, value: 1 }; run(0.05); pad.buttons[0] = { pressed: false, value: 0 }; run(0.05);
+    check(g.state === 'playing' && g.input.locked, 'A resumes without needing the mouse');
+    return { slowWalk: r2(slow) };
+  },
+
+  async shards_and_waypoint() {
+    g.start('new'); g.simulate(0.3);
+    g.frame(0.016);
+    const wp = g.waypoint();
+    check(wp && Math.abs(wp[2] - 6) < 0.1, 'waypoint points at the first objective');
+    check(!document.getElementById('waypoint').classList.contains('hidden'), 'marker is shown');
+    check(g.shardCount === 0, 'no shards yet');
+    at(-17, 0, -28.4); g.simulate(0.3);
+    check(g.shardCount === 1 && g.seen.has('shard:1'), 'walking into a shard collects it');
+    at(0, 0, 5); g.simulate(0.3); g.frame(0.016);
+    check(Math.abs(g.waypoint()[2] + 11.9) < 0.1 || g.seen.has('mass:float'), 'waypoint advances with the objective');
+    return { shards: g.shardCount };
+  },
+
   async combos_float_plus_ice_plus_pulse() {
     g.start('sandbox'); g.simulate(0.5);
     const c = g.dynamics.bodies.find((d) => d.p.tags.has('crate') && d.home.x > 250 && d.p.body.mass() === 45);
@@ -455,6 +522,66 @@ async function saveRestore(page, url) {
   return { continue: res.summary, restart: fresh };
 }
 
+// phone-sized touch context: the on-screen controls must drive the real game
+async function mobileTouch(browser, url) {
+  const ctx = await browser.newContext({ viewport: { width: 844, height: 390 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
+  const page = await ctx.newPage();
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  try {
+    await page.goto(`${url}/?test=1`);
+    await page.waitForFunction(() => window.__rb && window.__rb.state === 'menu', null, { timeout: 180000 });
+    await page.locator('#menu button', { hasText: 'Sandbox' }).tap();
+    const res = await page.evaluate(`(async () => { ${HELPERS}
+      check(g.input.touch && document.body.classList.contains('touch'), 'touch device detected');
+      check(g.state === 'playing' && g.input.locked, 'tapping the menu starts the game with no pointer lock');
+      check(g.settings.quality === 'low', 'phones start on the performance preset');
+      const root = document.getElementById('touch');
+      check(!root.classList.contains('hidden'), 'touch controls visible');
+      const T = (id, x, y, target) => new Touch({ identifier: id, target, clientX: x, clientY: y });
+      const send = (type, t, target) => target.dispatchEvent(new TouchEvent(type, { changedTouches: [t], touches: type === 'touchend' ? [] : [t], bubbles: true, cancelable: true }));
+      at(300, 0, 16, 0, 0); g.simulate(0.2);
+      // left thumb: push the floating stick forward
+      send('touchstart', T(1, 120, 260, root), root); send('touchmove', T(1, 120, 190, root), root);
+      g.simulate(1.5);
+      check(g.player.pos.z < 9, 'left thumb walks forward, z=' + g.player.pos.z);
+      send('touchend', T(1, 120, 190, root), root); g.simulate(0.5);
+      const zStop = g.player.pos.z; g.simulate(0.5);
+      check(Math.abs(g.player.pos.z - zStop) < 0.05, 'releasing the stick stops');
+      // right thumb: drag to look
+      const yaw0 = g.player.yaw;
+      send('touchstart', T(2, 560, 150, root), root); send('touchmove', T(2, 660, 150, root), root); g.simulate(0.05);
+      send('touchend', T(2, 660, 150, root), root);
+      check(g.player.yaw < yaw0 - 0.3, 'dragging on the right turns the view, d=' + (g.player.yaw - yaw0));
+      // hold SPRAY and drag: paints and keeps aiming
+      const fire = root.querySelector('.t-fire'), yaw1 = g.player.yaw;
+      send('touchstart', T(3, 780, 310, fire), fire); g.simulate(0.3);
+      send('touchmove', T(3, 740, 310, fire), root); g.simulate(0.3);
+      send('touchend', T(3, 740, 310, fire), root); g.simulate(0.2);
+      check(g.gun.shots >= 5, 'SPRAY fires, shots=' + g.gun.shots);
+      check(g.player.yaw > yaw1 + 0.1, 'dragging the SPRAY thumb still aims');
+      check(!g.input.down('Mouse0'), 'releasing SPRAY stops firing');
+      // jump + pigment tap + pause
+      const jump = root.querySelector('.t-jump');
+      send('touchstart', T(4, 700, 330, jump), jump); g.simulate(0.1); send('touchend', T(4, 700, 330, jump), root);
+      check(!g.player.grounded, 'JUMP jumps');
+      g.simulate(1);
+      const slot = document.querySelectorAll('#hotbar .slot')[3];
+      slot.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true }));
+      check(g.gun.selected === P.yellow, 'tapping a pigment selects it');
+      const pause = root.querySelector('.t-pause');
+      send('touchstart', T(5, 820, 30, pause), pause); g.frame(0.016); send('touchend', T(5, 820, 30, pause), root);
+      check(g.state === 'paused' && root.classList.contains('hidden'), 'pause button pauses');
+      const r = (sel) => document.querySelector(sel).getBoundingClientRect();
+      const hb = r('#hotbar');
+      check(hb.right < window.innerWidth - 210 && hb.width < 320, 'hotbar must stay clear of the thumb buttons: ' + hb.right + ' / ' + hb.width);
+      return { quality: g.settings.quality, fov: Math.round(g.stage.baseFov) };
+    })()`);
+    if (errors.length) throw new Error('page errors: ' + errors[0]);
+    return res;
+  } finally { await ctx.close(); }
+}
+
 const filter = process.argv[2];
 const srv = await serve();
 let failed = 0, passed = 0;
@@ -478,6 +605,11 @@ try {
   if (!filter || 'save_restore'.includes(filter)) {
     try { const res = await saveRestore(page, srv.url); passed++; console.log(`  PASS  save_restore_across_reload  ${JSON.stringify(res)}`); }
     catch (e) { failed++; console.log(`  FAIL  save_restore_across_reload\n        ${String(e.message).split('\n')[0]}`); }
+  }
+  if (!filter || 'mobile_touch'.includes(filter)) {
+    await page.goto('about:blank'); // free the software renderer for the second context
+    try { const res = await mobileTouch(browser, srv.url); passed++; console.log(`  PASS  mobile_touch_controls  ${JSON.stringify(res)}`); }
+    catch (e) { failed++; console.log(`  FAIL  mobile_touch_controls\n        ${String(e.message).split('\n')[0]}`); }
   }
   const real = errors.filter((e) => !/favicon/.test(e));
   if (real.length) { failed++; console.log('  FAIL  console errors:\n        ' + [...new Set(real)].slice(0, 5).join('\n        ')); }

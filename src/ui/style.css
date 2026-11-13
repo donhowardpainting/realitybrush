@@ -4,10 +4,11 @@
   font-family: "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
 }
 * { box-sizing: border-box; }
-html, body { margin: 0; height: 100%; overflow: hidden; background: #07080b; color: var(--ink); }
+html, body { margin: 0; height: 100%; overflow: hidden; background: #07080b; color: var(--ink); overscroll-behavior: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+canvas#c { touch-action: none; }
 canvas#c { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 .hidden { display: none !important; }
-#hud { position: fixed; inset: 0; pointer-events: none; user-select: none; }
+#hud { position: fixed; inset: 0; z-index: 5; pointer-events: none; user-select: none; }
 
 #crosshair { position: absolute; left: 50%; top: 50%; width: 26px; height: 26px; margin: -13px 0 0 -13px; border: 2px solid var(--c, #fff); border-radius: 50%; opacity: 0.85; box-shadow: 0 0 10px var(--c, #fff); transition: border-color .15s, box-shadow .15s, transform .08s; }
 #crosshair i { position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; margin: -2px; border-radius: 50%; background: #fff; }
@@ -18,7 +19,7 @@ canvas#c { position: fixed; inset: 0; width: 100%; height: 100%; display: block;
 #objective.flash { animation: objflash .9s ease; }
 @keyframes objflash { 0% { background: rgba(255,255,255,.35); transform: translateX(-8px); } 100% { background: var(--panel); transform: none; } }
 
-#hint { position: absolute; left: 50%; bottom: 150px; transform: translateX(-50%); padding: 9px 18px; background: var(--panel); border-radius: 4px; font-size: 15px; letter-spacing: .04em; opacity: 0; transition: opacity .35s; text-align: center; max-width: 80vw; }
+#hint { position: absolute; left: 50%; bottom: 150px; transform: translateX(-50%); padding: 7px 16px; background: rgba(10, 12, 17, 0.45); border-radius: 999px; font-size: 14px; line-height: 1.5; letter-spacing: .04em; opacity: 0; transition: opacity .35s; text-align: center; max-width: min(720px, 72vw); text-shadow: 0 1px 4px #000; }
 #hint.show { opacity: 1; }
 #hint kbd, .controls kbd { display: inline-block; min-width: 22px; padding: 1px 7px; margin: 0 2px; border: 1px solid rgba(255,255,255,.45); border-bottom-width: 3px; border-radius: 4px; font: 700 12px/18px inherit; text-align: center; background: rgba(255,255,255,.08); }
 
@@ -76,3 +77,67 @@ button.mb small { display: block; margin-top: 5px; font-size: 10px; letter-spaci
 .stats b { display: block; font-size: 30px; color: var(--ink); letter-spacing: .04em; font-weight: 300; margin-bottom: 4px; }
 .ending p.lead { color: var(--dim); letter-spacing: .12em; line-height: 1.7; max-width: 560px; margin: 14px auto 0; }
 .foot { position: fixed; left: 0; right: 0; bottom: 16px; text-align: center; font-size: 11px; letter-spacing: .2em; color: rgba(255,255,255,.3); }
+
+/* ---- objective marker, bomb charge, shard counter ---- */
+#waypoint { position: absolute; left: 0; top: 0; width: 0; height: 0; will-change: transform; }
+#waypoint i { position: absolute; left: -7px; top: -7px; width: 14px; height: 14px; border: 2px solid var(--c, #fff); transform: rotate(45deg); box-shadow: 0 0 10px var(--c, #fff); opacity: .85; }
+#waypoint.off i { background: var(--c, #fff); opacity: .7; }
+#waypoint span { position: absolute; left: -30px; top: 13px; width: 60px; text-align: center; font-size: 11px; letter-spacing: .12em; color: var(--ink); text-shadow: 0 1px 4px #000; }
+#bomb-pip { position: absolute; left: calc(50% + 22px); top: calc(50% - 11px); width: 4px; height: 22px; border-radius: 2px; background: linear-gradient(to top, #fff calc(var(--f, 100) * 1%), rgba(255,255,255,.18) 0); opacity: .45; }
+#bomb-pip.ready { opacity: .9; box-shadow: 0 0 6px #fff; }
+#shards { position: absolute; left: 28px; top: 96px; padding: 4px 12px; font-size: 12px; letter-spacing: .2em; color: #7fffe8; background: rgba(10, 12, 17, 0.45); border-radius: 999px; text-shadow: 0 0 8px rgba(127,255,232,.6); }
+
+/* ---- touch controls ---- */
+#touch { position: fixed; inset: 0; z-index: 3; touch-action: none; }
+.t-stick { position: absolute; width: 124px; height: 124px; margin: -62px 0 0 -62px; border-radius: 50%; border: 2px solid rgba(255,255,255,.28); background: rgba(255,255,255,.05); opacity: 0; transition: opacity .15s; pointer-events: none; }
+.t-stick.on { opacity: 1; }
+.t-stick i { position: absolute; left: 50%; top: 50%; width: 54px; height: 54px; border-radius: 50%; background: rgba(255,255,255,.3); transform: translate(-50%, -50%); }
+.t-btn { all: unset; position: absolute; display: grid; place-items: center; border-radius: 50%; border: 2px solid rgba(255,255,255,.35); background: rgba(10,12,17,.35); color: #fff; font: 700 11px/1 inherit; letter-spacing: .12em; touch-action: none; }
+.t-btn span { pointer-events: none; }
+.t-btn.on { background: rgba(255,255,255,.3); transform: scale(.94); }
+.t-fire { right: calc(26px + env(safe-area-inset-right)); bottom: calc(40px + env(safe-area-inset-bottom)); width: 92px; height: 92px; border-color: var(--purple); box-shadow: 0 0 18px -4px var(--purple); }
+.t-jump { right: calc(136px + env(safe-area-inset-right)); bottom: calc(22px + env(safe-area-inset-bottom)); width: 70px; height: 70px; }
+.t-bomb { right: calc(124px + env(safe-area-inset-right)); bottom: calc(106px + env(safe-area-inset-bottom)); width: 58px; height: 58px; }
+.t-pulse { right: calc(40px + env(safe-area-inset-right)); bottom: calc(148px + env(safe-area-inset-bottom)); width: 58px; height: 58px; }
+.t-pause { right: calc(12px + env(safe-area-inset-right)); top: calc(10px + env(safe-area-inset-top)); width: 42px; height: 42px; font-size: 13px; }
+
+/* the hotbar is tappable and sits above the touch layer */
+#hotbar { z-index: 4; }
+.slot { pointer-events: auto; }
+body.touch #toasts { top: calc(62px + env(safe-area-inset-top)); }
+body.touch #objective, body.touch #shards { left: calc(14px + env(safe-area-inset-left)); }
+
+/* ---- small screens (phones, landscape or portrait) ---- */
+@media (max-height: 520px), (max-width: 720px) {
+  #objective { left: 12px; top: 10px; max-width: 54vw; padding: 7px 11px; font-size: 13px; }
+  #objective .tag { display: none; }
+  #shards { top: 52px; left: 12px; }
+  #hotbar { bottom: calc(8px + env(safe-area-inset-bottom)); gap: 6px; }
+  .slot { width: 40px; height: 40px; border-radius: 8px; }
+  .slot b { width: 20px; height: 20px; }
+  .slot em { display: none; }
+  .slot.sel { transform: translateY(-5px) scale(1.1); }
+  #paint-name { bottom: calc(56px + env(safe-area-inset-bottom)); }
+  #paint-name span { display: none; }
+  #paint-name b { font-size: 11px; }
+  #hint { bottom: calc(84px + env(safe-area-inset-bottom)); font-size: 12px; max-width: 56vw; padding: 5px 12px; }
+  #title-card { top: 22%; }
+  #title-card h2 { font-size: clamp(18px, 4.4vw, 34px); letter-spacing: .16em; white-space: normal; }
+  #title-card p { font-size: 11px; letter-spacing: .25em; }
+  .toast { font-size: 11px; padding: 6px 10px; }
+  #menu { align-items: flex-start; overflow-y: auto; -webkit-overflow-scrolling: touch; background: rgba(5,6,9,.8); }
+  .menu-inner { padding: calc(14px + env(safe-area-inset-top)) 18px 40px; max-width: none; width: 100%; }
+  .logo { font-size: clamp(30px, 9vw, 56px); }
+  .tagline { margin: 6px 0 14px; font-size: 11px; letter-spacing: .3em; }
+  .btns { width: min(340px, 100%); gap: 7px; }
+  button.mb { padding: 11px 14px; font-size: 13px; }
+  .controls { margin-top: 14px; font-size: 11px; }
+  .settings { margin-top: 12px; width: min(340px, 100%); }
+  .stats { gap: 16px; margin: 14px 0 16px; flex-wrap: wrap; }
+  .stats b { font-size: 22px; }
+  .foot { display: none; }
+}
+@media (max-width: 720px) and (orientation: portrait) {
+  #objective { max-width: 70vw; }
+  .t-fire { width: 84px; height: 84px; }
+}

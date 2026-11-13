@@ -14,6 +14,7 @@ import { Growth } from './systems/growth';
 import { PowerSys } from './systems/power';
 import { Zones, Checkpoint } from './systems/zones';
 import { Hud } from './ui/hud';
+import { TouchControls } from './ui/touch';
 import { Builder } from './world/builder';
 import { buildWorld, LevelDef } from './world/level';
 
@@ -41,6 +42,7 @@ export class Game {
   power!: PowerSys;
   zones!: Zones;
   hud!: Hud;
+  touchUi!: TouchControls;
   level!: LevelDef;
   builder!: Builder;
 
@@ -64,12 +66,19 @@ export class Game {
   fps = 60;
 
   constructor(canvas: HTMLCanvasElement, public flags: Flags) {
+    this.input = new Input(canvas);
+    this.input.virtual = flags.test;
+    // phones and tablets start on the lighter preset unless the player has chosen otherwise
+    if (this.input.touch) this.settings.quality = 'low';
     try { Object.assign(this.settings, JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}')); } catch { /* ignore */ }
     if (flags.quality) this.settings.quality = flags.quality;
     this.stage = new Stage(canvas, this.settings.quality);
+    this.stage.coarse = this.input.touch;
+    if (this.input.touch) this.stage.setQuality(this.settings.quality);
+    document.body.classList.toggle('touch', this.input.touch);
+    document.body.dataset.device = this.input.device;
+    this.input.onDevice = (d) => { document.body.dataset.device = d; };
     this.physics = new Physics();
-    this.input = new Input(canvas);
-    this.input.virtual = flags.test;
     this.mats = new Materials();
     this.paint = new PaintWorld(this.physics, this.stage.scene);
     this.glow = new Particles(5000, true);
@@ -77,13 +86,14 @@ export class Game {
     this.stage.scene.add(this.glow.points, this.drops.points);
     window.addEventListener('resize', () => this.stage.resize());
     // browsers may refuse an immediate re-lock after Esc; a click on the view always recovers
-    canvas.addEventListener('click', () => { if (this.state === 'playing' && !this.input.locked) this.input.lock(); });
+    canvas.addEventListener('click', () => { if (this.state !== 'playing') return; if (!this.input.locked) this.input.lock(); else this.input.capture(); });
   }
 
   get unlocked(): Set<Paint> { return this.mode === 'sandbox' ? ALL : this.unlockedStory; }
 
   async init(progress: (f: number, text?: string) => void) {
     this.hud = new Hud(this);
+    this.touchUi = new TouchControls(this);
     this.dynamics = new Dynamics(this);
     this.power = new PowerSys(this);
     this.zones = new Zones(this);
@@ -113,6 +123,7 @@ export class Game {
       this.ended = save.done;
       this.level.restoreState(this.seen);
       for (const p of this.unlockedStory) this.zones.removePickup(p);
+      for (const sh of this.zones.shards) if (this.seen.has('shard:' + sh.i)) this.zones.hideShard(sh.i);
       this.storyCp = this.zones.checkpoints.find((c) => c.id === save.cp) ?? null;
       this.stage.restore = this.stage.restoreTarget = this.restoreLevel();
     }
@@ -140,7 +151,7 @@ export class Game {
   }
 
   emit(ev: string, data?: any) {
-    const persistent = /^(zone|pickup|power|socket|mass|finale|grow)/.test(ev);
+    const persistent = /^(zone|pickup|power|socket|mass|finale|grow|shard)/.test(ev);
     const first = persistent && !this.seen.has(ev);
     if (persistent && this.mode === 'story') this.seen.add(ev);
     for (const f of this.listeners.get(ev) ?? []) f(data);
@@ -185,7 +196,7 @@ export class Game {
   }
 
   private refreshObjective(withHint = false) {
-    if (this.mode === 'sandbox') { this.hud.objective('TEST RANGE — every pigment unlocked. C spawns a crate. Experiment.', PAINTS[Paint.Yellow].css); return; }
+    if (this.mode === 'sandbox') { this.hud.objective(this.input.device === 'kbm' ? 'TEST RANGE — every pigment unlocked. C spawns a crate. Experiment.' : 'TEST RANGE — every pigment unlocked. Experiment.', PAINTS[Paint.Yellow].css); return; }
     const o = this.objectiveNow();
     if (!o) { this.hud.objective('Reality rewritten. The city is yours.', '#52ffe0'); return; }
     this.hud.objective(o.text, o.color ?? '#ffffff');
@@ -226,6 +237,24 @@ export class Game {
       if (d.home.distanceTo(this.player.pos) < radius) this.dynamics.respawn(d);
     }
     this.level.resetProps?.();
+  }
+
+  get shardCount(): number { let n = 0; for (const e of this.seen) if (e.startsWith('shard:')) n++; return n; }
+
+  collectShard(i: number) {
+    this.emit('shard:' + i);
+    this.audio.unlock();
+    this.input.rumble(0.4, 0.6, 160);
+    this.stage.pulse(0x7fffe8, 0.18);
+    this.glow.burst(this.player.pos, null, new THREE.Color(0x7fffe8), 50, 6, 0.08, 1, -1, 1.6);
+    this.hud.toast(`ECHO SHARD ${this.shardCount} / ${this.zones.shards.length}`, '#7fffe8');
+    this.hud.refreshShards();
+  }
+
+  /** World position the current objective points at, if any. */
+  waypoint(): [number, number, number] | null {
+    if (this.mode !== 'story') return null;
+    return this.objectiveNow()?.at ?? null;
   }
 
   private finale() {
@@ -302,7 +331,12 @@ export class Game {
       this.save();
     }
     this.player.gravScale = 1;
+    if (this.input.touch && !this.flags.test) {
+      // best effort: phones play far better full-screen and sideways
+      try { (document.documentElement.requestFullscreen?.() as Promise<void> | undefined)?.then(() => (screen.orientation as any)?.lock?.('landscape')?.catch?.(() => {}))?.catch?.(() => {}); } catch { /* unsupported */ }
+    }
     this.hud.refreshUnlocked();
+    this.hud.refreshShards();
     if (!this.unlocked.has(this.gun.selected) && this.gun.selected !== Paint.None) this.gun.select([...this.unlocked][0] ?? Paint.None, true);
     this.hud.setSelected(this.gun.selected);
     this.refreshObjective(kind !== 'new');
@@ -315,12 +349,15 @@ export class Game {
     this.hud.show(true);
     this.state = 'playing';
     if (this.player.gravScale < 0) this.player.gravScale = 1;
+    this.touchUi.show(this.input.touch);
     this.input.lock();
   }
 
   pause() {
     if (this.state !== 'playing') return;
     this.state = 'paused';
+    this.touchUi.show(false);
+    if (this.input.locked) this.input.unlock();
     this.audio.spray(false, this.gun.selected);
     this.hud.showPause();
     document.getElementById('menu')!.classList.remove('hidden');
@@ -349,12 +386,14 @@ export class Game {
 
   frame(dt: number) {
     const playing = this.state === 'playing';
+    this.input.poll(dt);
+    if (!playing) this.menuNav();
     if (playing) {
       this.player.frame(dt);
       this.gun.frame(dt);
       if (this.input.hit('KeyR')) this.respawn();
       if (this.input.hit('KeyC') && this.mode === 'sandbox') this.level.spawnCrate?.();
-      if (this.input.hit('Escape') && this.input.virtual) this.pause();
+      if (this.input.hit('Escape') && !this.input.captured) this.pause();
       this.acc += dt;
       let steps = 0;
       while (this.acc >= FIXED && steps < 4) { this.fixed(FIXED); this.acc -= FIXED; steps++; }
@@ -386,14 +425,30 @@ export class Game {
         this.finaleT = -1;
         this.save();
         this.state = 'ending';
+        this.touchUi.show(false);
         this.input.unlock();
-        this.hud.showEnding({ time: this.playTime, splats: this.paint.splatCount, bounces: this.player.stats.bounces });
+        this.hud.showEnding({ time: this.playTime, splats: this.paint.splatCount, bounces: this.player.stats.bounces, shards: this.shardCount, shardTotal: this.zones.shards.length });
         document.getElementById('menu')!.classList.remove('hidden');
       }
     }
     this.stage.update(dt, cam.position);
     this.audio.update(dt);
     this.hud.update(dt);
+  }
+
+  /** Drive whatever menu is open from a gamepad. */
+  private menuNav() {
+    const m = this.input.menu;
+    if (!m.up && !m.down && !m.accept && !m.back) return;
+    const btns = Array.from(document.querySelectorAll<HTMLButtonElement>('#menu:not(.hidden) button.mb'));
+    if (!btns.length) return;
+    let i = btns.indexOf(document.activeElement as HTMLButtonElement);
+    if (m.down) i = (i + 1) % btns.length;
+    else if (m.up) i = (i - 1 + btns.length) % btns.length;
+    if (i < 0) i = 0;
+    btns[i].focus();
+    if (m.accept) btns[i].click();
+    else if (m.back && this.state === 'paused') this.resume();
   }
 
   fixed(dt: number) {

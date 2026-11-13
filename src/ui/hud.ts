@@ -4,15 +4,43 @@ import { Paint, PAINTS, PAINT_ORDER } from '../paint/types';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 
-const CONTROLS = `
-<div class="controls">
-  <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></span><span>Move &nbsp;·&nbsp; <kbd>Shift</kbd> sprint &nbsp;·&nbsp; <kbd>Space</kbd> jump</span>
-  <span><kbd>LMB</kbd></span><span>Spray paint</span>
-  <span><kbd>RMB</kbd> / <kbd>F</kbd></span><span>Kinetic pulse — shove objects</span>
-  <span><kbd>1</kbd>–<kbd>5</kbd> / wheel</span><span>Select pigment</span>
-  <span><kbd>Q</kbd></span><span>Solvent — strips paint</span>
-  <span><kbd>R</kbd></span><span>Return to checkpoint &nbsp;·&nbsp; <kbd>Esc</kbd> pause</span>
-</div>`;
+const CONTROL_SETS: Record<string, [string, string][]> = {
+  kbm: [
+    ['<kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>', 'Move &nbsp;·&nbsp; <kbd>Shift</kbd> sprint &nbsp;·&nbsp; <kbd>Space</kbd> jump'],
+    ['<kbd>LMB</kbd>', 'Spray paint &nbsp;·&nbsp; <kbd>E</kbd> paint bomb'],
+    ['<kbd>RMB</kbd> / <kbd>F</kbd>', 'Kinetic pulse — shove objects'],
+    ['<kbd>1</kbd>–<kbd>5</kbd> / wheel', 'Select pigment &nbsp;·&nbsp; <kbd>Q</kbd> solvent'],
+    ['<kbd>R</kbd>', 'Return to checkpoint &nbsp;·&nbsp; <kbd>Esc</kbd> pause'],
+  ],
+  pad: [
+    ['<kbd>L</kbd> / <kbd>R</kbd> sticks', 'Move / look &nbsp;·&nbsp; <kbd>L3</kbd> sprint &nbsp;·&nbsp; <kbd>A</kbd> jump'],
+    ['<kbd>RT</kbd>', 'Spray paint &nbsp;·&nbsp; <kbd>X</kbd> paint bomb'],
+    ['<kbd>LT</kbd>', 'Kinetic pulse — shove objects'],
+    ['<kbd>LB</kbd> / <kbd>RB</kbd>', 'Select pigment &nbsp;·&nbsp; <kbd>B</kbd> solvent'],
+    ['<kbd>Start</kbd>', 'Pause — return to checkpoint from there'],
+  ],
+  touch: [
+    ['Left thumb', 'Move — push past the ring to sprint'],
+    ['Right thumb', 'Drag to look &nbsp;·&nbsp; hold <kbd>SPRAY</kbd> and drag to paint a stroke'],
+    ['<kbd>BOMB</kbd>', 'One big splash of the selected pigment'],
+    ['<kbd>PULSE</kbd>', 'Shove objects &nbsp;·&nbsp; tap a pigment to select it'],
+  ],
+};
+const controlsHtml = (device: string) =>
+  `<div class="controls">${(CONTROL_SETS[device] ?? CONTROL_SETS.kbm).map(([k, v]) => `<span>${k}</span><span>${v}</span>`).join('')}</div>`;
+
+/** Rewrite keyboard prompts inside a hint for the device actually in use. */
+function forDevice(html: string, device: string): string {
+  if (device === 'kbm') return html;
+  const pad = device === 'pad';
+  const map: Record<string, string> = pad
+    ? { LMB: 'RT', RMB: 'LT', Space: 'A', Q: 'B', E: 'X', Shift: 'L3', R: 'Start', F: 'LT' }
+    : { LMB: 'SPRAY', RMB: 'PULSE', Space: 'JUMP', Q: 'SOLVENT', E: 'BOMB', F: 'PULSE' };
+  return html
+    .replace(/<kbd>W<\/kbd><kbd>A<\/kbd><kbd>S<\/kbd><kbd>D<\/kbd>/g, pad ? '<kbd>L-STICK</kbd>' : '<kbd>LEFT THUMB</kbd>')
+    .replace(/<kbd>[1-5]<\/kbd>\s*/g, '')
+    .replace(/<kbd>([^<]+)<\/kbd>/g, (m, k) => (map[k] ? `<kbd>${map[k]}</kbd>` : m));
+}
 
 export class Hud {
   private slots = new Map<Paint, HTMLElement>();
@@ -31,6 +59,7 @@ export class Hud {
       d.className = 'slot locked';
       d.style.setProperty('--c', PAINTS[p].css);
       d.innerHTML = `<em>${key}</em><b></b>`;
+      d.addEventListener('pointerdown', (e) => { e.preventDefault(); if (this.game.state === 'playing') this.game.gun.select(p); });
       bar.appendChild(d);
       this.slots.set(p, d);
     };
@@ -72,7 +101,7 @@ export class Hud {
   /** Bottom-centre contextual hint. HTML allowed (<kbd>). */
   hint(html: string, seconds = 7) {
     const h = $('hint');
-    h.innerHTML = html;
+    h.innerHTML = forDevice(html, this.game.input.device);
     h.classList.add('show');
     this.hintTimer = seconds;
   }
@@ -105,6 +134,10 @@ export class Hud {
     if (this.titleTimer > 0 && (this.titleTimer -= dt) <= 0) $('title-card').classList.remove('show');
     const pl = this.game.player;
     $('crosshair').classList.toggle('fire', this.game.input.down('Mouse0'));
+    this.updateWaypoint();
+    const ready = this.game.gun.bombReady;
+    $('bomb-pip').style.setProperty('--f', String(Math.round(ready * 100)));
+    $('bomb-pip').classList.toggle('ready', ready >= 1);
     const tags = [pl.climbing ? 'CLIMBING' : '', pl.onIce ? 'NO FRICTION' : '', pl.lowG && !pl.grounded ? 'LOW GRAVITY' : ''].filter(Boolean).join(' · ');
     if (tags !== this.tags) { this.tags = tags; $('state-tags').textContent = tags; }
     if ((this.aimT -= dt) <= 0) {
@@ -135,6 +168,36 @@ export class Hud {
     if (p.fertile === 'stalk') return 'FERTILE SOIL';
     if (p.resist) return 'PAINT-RESISTANT';
     return '';
+  }
+
+  refreshShards() {
+    const g = this.game, el = $('shards');
+    const n = g.shardCount;
+    el.classList.toggle('hidden', g.mode !== 'story' || n === 0);
+    el.textContent = `◆ ${n} / ${g.zones.shards.length}`;
+  }
+
+  /** Objective marker: a diamond pinned to the goal, clamped to the screen edge when off-view. */
+  private updateWaypoint() {
+    const g = this.game, el = $('waypoint');
+    const at = g.state === 'playing' ? g.waypoint() : null;
+    if (!at) { el.classList.add('hidden'); return; }
+    const cam = g.stage.camera, v = this.dir.set(at[0], at[1], at[2]);
+    const dist = v.distanceTo(cam.position);
+    if (dist < 3.5) { el.classList.add('hidden'); return; }
+    v.applyMatrix4(cam.matrixWorldInverse);
+    const behind = v.z > -0.1;
+    v.applyMatrix4(cam.projectionMatrix);
+    let x = v.x, y = v.y;
+    if (behind) { x = -x; y = -y; }
+    const off = behind || Math.abs(x) > 0.9 || Math.abs(y) > 0.82;
+    if (off) { const k = Math.max(Math.abs(x) / 0.9, Math.abs(y) / 0.82, 1e-3); x /= k; y /= k; if (behind && Math.abs(x) < 0.5) x = Math.sign(x || 1) * 0.9; }
+    el.classList.remove('hidden');
+    el.classList.toggle('off', off);
+    el.style.transform = `translate(${((x * 0.5 + 0.5) * window.innerWidth).toFixed(1)}px, ${((-y * 0.5 + 0.5) * window.innerHeight).toFixed(1)}px)`;
+    const label = Math.round(dist) + ' m';
+    if (el.dataset.d !== label) { el.dataset.d = label; el.querySelector('span')!.textContent = label; }
+    el.style.setProperty('--c', $('objective').style.getPropertyValue('--oc') || '#fff');
   }
 
   /* ---------------------------------------------------------------- menus */
@@ -171,7 +234,7 @@ export class Hud {
   showMain() {
     const g = this.game, m = $('menu');
     m.className = '';
-    m.innerHTML = `<div class="menu-inner"><h1 class="logo">REALITY <span>BRUSH</span></h1><p class="tagline">Rewrite the world</p><div class="btns"></div>${CONTROLS}</div><div class="foot">A TOOL THAT SHOULD NOT EXIST</div>`;
+    m.innerHTML = `<div class="menu-inner"><h1 class="logo">REALITY <span>BRUSH</span></h1><p class="tagline">Rewrite the world</p><div class="btns"></div>${controlsHtml(g.input.device)}</div><div class="foot">A TOOL THAT SHOULD NOT EXIST</div>`;
     const b = m.querySelector('.btns')!;
     if (g.hasSave()) b.appendChild(this.btn('Continue', g.saveSummary(), 'var(--green)', () => g.start('continue')));
     b.appendChild(this.btn('New Game', 'Three districts · one impossible tool', 'var(--purple)', () => g.start('new')));
@@ -182,7 +245,7 @@ export class Hud {
   showPause() {
     const g = this.game, m = $('menu');
     m.className = 'center';
-    m.innerHTML = `<div class="menu-inner"><h3>PAUSED</h3><p class="tagline">${g.mode === 'sandbox' ? 'Sandbox — test range' : g.currentObjective()}</p><div class="btns"></div>${CONTROLS}</div>`;
+    m.innerHTML = `<div class="menu-inner"><h3>PAUSED</h3><p class="tagline">${g.mode === 'sandbox' ? 'Sandbox — test range' : g.currentObjective()}</p><div class="btns"></div>${controlsHtml(g.input.device)}</div>`;
     const b = m.querySelector('.btns')!;
     b.appendChild(this.btn('Resume', '', 'var(--green)', () => g.resume()));
     b.appendChild(this.btn('Return to checkpoint', '', 'var(--blue)', () => { g.respawn(); g.resume(); }));
@@ -204,13 +267,13 @@ export class Hud {
     m.querySelector('.btns')!.appendChild(this.btn('Begin', '', 'var(--purple)', fn));
   }
 
-  showEnding(stats: { time: number; splats: number; bounces: number }) {
+  showEnding(stats: { time: number; splats: number; bounces: number; shards: number; shardTotal: number }) {
     const g = this.game, m = $('menu');
     const mm = Math.floor(stats.time / 60), ss = Math.floor(stats.time % 60);
     m.className = 'center ending';
     m.innerHTML = `<div class="menu-inner"><h1 class="logo">REALITY <span>REWRITTEN</span></h1>
       <p class="lead">The gravity core is singing again. Colour is pouring back into the city, street by street — and the brush is still warm in your hands.</p>
-      <div class="stats"><div><b>${mm}:${String(ss).padStart(2, '0')}</b>Time</div><div><b>${stats.splats}</b>Splats</div><div><b>${stats.bounces}</b>Bounces</div></div>
+      <div class="stats"><div><b>${mm}:${String(ss).padStart(2, '0')}</b>Time</div><div><b>${stats.splats}</b>Splats</div><div><b>${stats.bounces}</b>Bounces</div><div><b>${stats.shards}/${stats.shardTotal}</b>Echo shards</div></div>
       <div class="btns"></div></div>`;
     const b = m.querySelector('.btns')!;
     b.appendChild(this.btn('Keep exploring', 'The world stays painted', 'var(--green)', () => g.resume()));

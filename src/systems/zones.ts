@@ -4,6 +4,7 @@ import { Paint, PAINTS } from '../paint/types';
 
 export interface Checkpoint { id: string; pos: THREE.Vector3; yaw: number; ring: THREE.Mesh; beam: THREE.Mesh; active: boolean; title: string }
 interface Trigger { id: string; min: THREE.Vector3; max: THREE.Vector3; fired: boolean; fn?: () => void }
+interface Shard { i: number; pos: THREE.Vector3; mesh: THREE.Mesh; taken: boolean }
 interface Pickup { paint: Paint; pos: THREE.Vector3; group: THREE.Group; taken: boolean; halo: THREE.Mesh }
 
 /** Checkpoints, pigment pickups, trigger volumes and kill volumes. */
@@ -12,6 +13,8 @@ export class Zones {
   triggers: Trigger[] = [];
   pickups: Pickup[] = [];
   kills: { min: THREE.Vector3; max: THREE.Vector3 }[] = [];
+  shards: Shard[] = [];
+  private shardMat = new THREE.MeshStandardMaterial({ color: 0x101418, emissive: 0x7fffe8, emissiveIntensity: 2.4, roughness: 0.2, metalness: 0.4 });
   killY = -3.2;
   current: Checkpoint | null = null;
 
@@ -27,7 +30,7 @@ export class Zones {
       new THREE.ShaderMaterial({
         uniforms: { uColor: { value: new THREE.Color(0x9fb4c0) }, uA: { value: 0.05 } },
         vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-        fragmentShader: 'varying vec2 vUv; uniform vec3 uColor; uniform float uA; void main(){ gl_FragColor = vec4(uColor * pow(1.0 - vUv.y, 2.2) * uA, 1.0); }',
+        fragmentShader: 'varying vec2 vUv; uniform vec3 uColor; uniform float uA; void main(){ gl_FragColor = vec4(uColor * pow(clamp(1.0 - vUv.y, 0.0, 1.0), 2.2) * uA, 1.0); }',
         blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, side: THREE.DoubleSide, fog: false,
       }),
     );
@@ -66,6 +69,17 @@ export class Zones {
     this.game.stage.scene.add(g);
     this.pickups.push({ paint, pos: new THREE.Vector3(x, y + 1.25, z), group: g, taken: false, halo });
   }
+
+  /** Optional collectible, usually parked somewhere that takes a little paint to reach. */
+  addShard(x: number, y: number, z: number) {
+    const mesh = new THREE.Mesh(new THREE.OctahedronGeometry(0.26, 0), this.shardMat);
+    mesh.position.set(x, y, z);
+    mesh.scale.set(1, 1.7, 1);
+    this.game.stage.scene.add(mesh);
+    this.shards.push({ i: this.shards.length, pos: new THREE.Vector3(x, y, z), mesh, taken: false });
+  }
+
+  hideShard(i: number) { const s = this.shards[i]; if (s) { s.taken = true; s.mesh.visible = false; } }
 
   activate(cp: Checkpoint, silent = false) {
     if (this.current === cp) return;
@@ -119,6 +133,16 @@ export class Zones {
       if (Math.hypot(p.x - pk.pos.x, p.z - pk.pos.z) < 2.7 && Math.abs(p.y - pk.pos.y) < 2.2) {
         this.hide(pk);
         game.unlock(pk.paint);
+      }
+    }
+    for (const sh of this.shards) {
+      if (sh.taken) continue;
+      sh.mesh.rotation.y = t * 1.6 + sh.i;
+      sh.mesh.position.y = sh.pos.y + Math.sin(t * 2.2 + sh.i) * 0.1;
+      if (Math.random() < 0.12) game.glow.spawn(sh.pos.x + (Math.random() - 0.5) * 0.5, sh.pos.y, sh.pos.z + (Math.random() - 0.5) * 0.5, 0, 0.6, 0, 0.5, 1, 0.9, 0.05, 1, -0.2, 0.5, 0.9);
+      if (Math.abs(p.x - sh.pos.x) < 1.3 && Math.abs(p.z - sh.pos.z) < 1.3 && Math.abs(p.y - 0.2 - sh.pos.y) < 1.6) {
+        this.hideShard(sh.i);
+        game.collectShard(sh.i);
       }
     }
     if (p.y < this.killY) { game.respawn(); return; }

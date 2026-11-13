@@ -6,8 +6,10 @@ const MAX_GLOBS = 220;
 const FIRE_INTERVAL = 0.065;
 const GLOB_SPEED = 42;
 const SPLAT_RADIUS = 0.5;
+const BOMB_RADIUS = 1.55;
+const BOMB_COOLDOWN = 2.4;
 
-interface Glob { alive: boolean; p: THREE.Vector3; v: THREE.Vector3; type: Paint; age: number; size: number }
+interface Glob { alive: boolean; p: THREE.Vector3; v: THREE.Vector3; type: Paint; age: number; size: number; big: boolean }
 
 const _d = new THREE.Vector3(), _p = new THREE.Vector3(), _q = new THREE.Quaternion(), _m = new THREE.Matrix4(), _s = new THREE.Vector3();
 const _up = new THREE.Vector3(0, 0, 1);
@@ -26,6 +28,9 @@ export class Gun {
   private globMesh: THREE.InstancedMesh;
   private cooldown = 0;
   private pulseCool = 0;
+  private bombCool = 0;
+  /** 0..1, 1 = paint bomb ready. */
+  get bombReady() { return 1 - Math.max(0, this.bombCool) / BOMB_COOLDOWN; }
   private recoil = 0;
   private recoilV = 0;
   private swayX = 0;
@@ -52,7 +57,7 @@ export class Gun {
     this.globMesh.count = 0;
     this.globMesh.setColorAt(0, new THREE.Color(1, 1, 1));
     game.stage.scene.add(this.globMesh);
-    for (let i = 0; i < MAX_GLOBS; i++) this.globs.push({ alive: false, p: new THREE.Vector3(), v: new THREE.Vector3(), type: Paint.None, age: 0, size: 0.07 });
+    for (let i = 0; i < MAX_GLOBS; i++) this.globs.push({ alive: false, p: new THREE.Vector3(), v: new THREE.Vector3(), type: Paint.None, age: 0, size: 0.07, big: false });
     this.applyColor(true);
   }
 
@@ -130,6 +135,7 @@ export class Gun {
       if (inp.hit('KeyQ') || inp.hit('Digit6') || inp.hit('KeyX')) this.select(Paint.None);
       if (inp.wheel) this.cycle(inp.wheel > 0 ? 1 : -1);
       if ((inp.hit('Mouse2') || inp.hit('KeyF')) && this.pulseCool <= 0) this.pulse();
+      if ((inp.hit('KeyE') || inp.hit('Mouse1')) && this.bombCool <= 0) this.bomb();
     }
     this.firing = active && inp.down('Mouse0');
     game.audio.spray(this.firing, this.selected);
@@ -152,6 +158,8 @@ export class Gun {
     );
     m.rotation.set(this.recoil * 0.22 + this.swayY * 1.5 + this.switchSpin * 0.5, this.swayX * 2.2, -this.swayX * 1.4 + this.switchSpin * 0.9);
     this.root.visible = game.state !== 'menu' && game.state !== 'loading';
+    // keep the brush in frame on narrow and portrait screens
+    this.root.position.x = 0.135 * Math.max(0.42, Math.min(1, game.stage.camera.aspect / 1.6));
     const t = game.time;
     this.rings.forEach((r, i) => { const k = 1 + this.heat * 0.25 * Math.sin(t * 30 - i * 1.4); r.scale.set(k, k, 1); });
     const glow = 1.1 + this.heat * 2.2 + Math.sin(t * 3) * 0.12;
@@ -161,7 +169,7 @@ export class Gun {
 
   /** Fixed step: emit and simulate paint globs. */
   fixedUpdate(dt: number) {
-    this.cooldown -= dt; this.pulseCool -= dt;
+    this.cooldown -= dt; this.pulseCool -= dt; this.bombCool -= dt;
     if (this.firing) {
       while (this.cooldown <= 0) { this.fire(); this.cooldown += FIRE_INTERVAL; }
     } else if (this.cooldown < 0) this.cooldown = 0;
@@ -189,7 +197,7 @@ export class Gun {
     const g = this.globs.find((x) => !x.alive);
     if (!g) return;
     const spread = 0.012;
-    g.alive = true; g.type = this.selected; g.age = 0; g.size = 0.055 + Math.random() * 0.03;
+    g.alive = true; g.type = this.selected; g.age = 0; g.size = 0.055 + Math.random() * 0.03; g.big = false;
     g.p.copy(origin);
     g.v.set(dir.x + (Math.random() - 0.5) * spread, dir.y + (Math.random() - 0.5) * spread, dir.z + (Math.random() - 0.5) * spread).multiplyScalar(GLOB_SPEED);
     g.v.addScaledVector(game.player.vel, 0.35);
@@ -202,13 +210,33 @@ export class Gun {
     }
   }
 
+  /** Paint bomb: one heavy lobbed glob that bursts into a 1.5 m pool. Covers ground fast. */
+  private bomb() {
+    const game = this.game;
+    const g = this.globs.find((x) => !x.alive);
+    if (!g) return;
+    const origin = _p, dir = _s;
+    this.aim(dir, origin);
+    this.bombCool = BOMB_COOLDOWN;
+    g.alive = true; g.type = this.selected; g.age = 0; g.size = 0.17; g.big = true;
+    g.p.copy(origin);
+    g.v.copy(dir).multiplyScalar(30).addScaledVector(game.player.vel, 0.35);
+    g.v.y += 1.5;
+    this.recoilV += 7;
+    game.audio.pulse();
+    game.input.rumble(0.6, 0.3, 120);
+    const c = this.color;
+    for (let i = 0; i < 14; i++) game.glow.spawn(origin.x, origin.y, origin.z, dir.x * 5 + (Math.random() - 0.5) * 4, dir.y * 5 + (Math.random() - 0.5) * 4, dir.z * 5 + (Math.random() - 0.5) * 4, c.r, c.g, c.b, 0.07, 0.35, 0, 3, 0.8);
+  }
+
   private stepGlobs(dt: number) {
     const game = this.game, ph = game.physics;
     let n = 0;
     for (const g of this.globs) {
       if (!g.alive) continue;
       g.age += dt;
-      if (g.age > 0.28) g.v.y -= 14 * dt; // flat trajectory at working range, arcs beyond it
+      if (g.big) g.v.y -= 11 * dt;
+      else if (g.age > 0.28) g.v.y -= 14 * dt; // flat trajectory at working range, arcs beyond it
       const sp = g.v.length();
       const step = sp * dt;
       const h = ph.castRay(g.p.x, g.p.y, g.p.z, g.v.x / sp, g.v.y / sp, g.v.z / sp, step + 0.02);
@@ -239,11 +267,16 @@ export class Gun {
     const c = PAINTS[g.type].color;
     const pt = _hitP.copy(point), nm = _hitN.copy(normal);
     let stuck = false;
-    if (p) stuck = game.paint.splat(p, pt, nm, g.type, SPLAT_RADIUS * (0.9 + Math.random() * 0.25));
+    if (p) stuck = game.paint.splat(p, pt, nm, g.type, g.big ? BOMB_RADIUS : SPLAT_RADIUS * (0.9 + Math.random() * 0.25));
+    if (g.big) {
+      game.audio.splat(g.type, 1.6);
+      game.drops.burst(pt, nm, c, 40, 8, 0.08, 0.8, 12);
+      game.glow.burst(pt, nm, c, 30, 6, 0.1, 0.6, 3, 1.8);
+    }
     // paint has momentum: nudge whatever it hits
     const body = collider.parent();
     if (body && body.isDynamic()) {
-      const k = 9 / GLOB_SPEED;
+      const k = (g.big ? 60 : 9) / GLOB_SPEED;
       body.applyImpulseAtPoint({ x: vel.x * k, y: vel.y * k, z: vel.z * k }, pt, true);
     }
     const dist = pt.distanceTo(game.player.eye);

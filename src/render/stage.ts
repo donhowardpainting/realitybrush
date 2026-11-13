@@ -22,11 +22,11 @@ void main(){
   vec3 zenB = vec3(0.07, 0.17, 0.42), horB = vec3(1.0, 0.56, 0.34);
   vec3 zen = mix(zenA, zenB, uRestore), hor = mix(horA, horB, uRestore);
   vec3 col = mix(hor, zen, pow(max(h, 0.0), 0.5));
-  float sd = max(dot(d, normalize(uSun)), 0.0);
+  float sd = clamp(dot(d, normalize(uSun)), 0.0, 1.0);
   vec3 sunC = mix(vec3(0.75, 0.82, 0.8), vec3(1.0, 0.72, 0.42), uRestore);
   col += sunC * (pow(sd, 6.0) * 0.25 + pow(sd, 48.0) * 0.6 + pow(sd, 900.0) * 6.0) * mix(0.55, 1.2, uRestore);
   // clouds
-  vec2 cp = d.xz / (d.y + 0.25) * 1.4 + vec2(uTime * 0.008, uTime * 0.003);
+  vec2 cp = d.xz / max(d.y + 0.25, 0.02) * 1.4 + vec2(uTime * 0.008, uTime * 0.003);
   float c = fbm(cp); float c2 = fbm(cp * 2.3 - uTime * 0.01);
   float cover = mix(0.38, 0.52, uRestore);
   float cl = smoothstep(cover, cover + 0.3, c * 0.7 + c2 * 0.3) * smoothstep(-0.02, 0.25, d.y);
@@ -36,10 +36,10 @@ void main(){
   float au = smoothstep(0.15, 0.9, d.y) * uRestore;
   float band = sin(d.x * 9.0 + fbm(d.xz * 3.0 + uTime * 0.05) * 6.0 + uTime * 0.2) * 0.5 + 0.5;
   vec3 auC = mix(vec3(0.3, 1.0, 0.6), vec3(0.7, 0.3, 1.0), fbm(d.xz * 2.0 - uTime * 0.03));
-  col += auC * pow(band, 6.0) * au * 0.35 * (1.0 - cl);
-  col += vec3(0.65, 0.4, 1.0) * uPulse * (0.3 + 0.7 * pow(1.0 - abs(d.y), 3.0));
-  col = mix(col, hor * 0.8, smoothstep(0.0, -0.15, d.y));
-  gl_FragColor = vec4(col, 1.0);
+  col += auC * pow(clamp(band, 0.0, 1.0), 6.0) * au * 0.35 * (1.0 - cl);
+  col += vec3(0.65, 0.4, 1.0) * uPulse * (0.3 + 0.7 * pow(clamp(1.0 - abs(d.y), 0.0, 1.0), 3.0));
+  col = mix(col, hor * 0.8, 1.0 - smoothstep(-0.15, 0.0, d.y));
+  gl_FragColor = vec4(clamp(col, 0.0, 60.0), 1.0);
 }`;
 
 const GRADE_FRAG = /* glsl */`
@@ -70,13 +70,31 @@ void main(){
   gl_FragColor = vec4(max(col, 0.0), 1.0);
 }`;
 
+/**
+ * Guard pass. A single NaN/Inf texel in the HDR buffer is smeared by bloom into a large black
+ * block, so anything non-finite is zeroed (and extreme values clamped) before bloom ever sees it.
+ */
+const SANITIZE_FRAG = /* glsl */`
+uniform sampler2D tDiffuse; varying vec2 vUv;
+void main(){
+  vec4 c = texture2D(tDiffuse, vUv);
+  bvec3 bad = bvec3(!(c.r >= 0.0 && c.r < 1.0e4), !(c.g >= 0.0 && c.g < 1.0e4), !(c.b >= 0.0 && c.b < 1.0e4));
+  if (bad.r || bad.g || bad.b) {
+    // borrow a finite neighbour if there is one, otherwise go dark
+    vec4 n = texture2D(tDiffuse, vUv + vec2(0.0, 0.002));
+    c = (n.r >= 0.0 && n.r < 1.0e4 && n.g >= 0.0 && n.g < 1.0e4 && n.b >= 0.0 && n.b < 1.0e4) ? n : vec4(0.0, 0.0, 0.0, 1.0);
+  }
+  gl_FragColor = vec4(min(c.rgb, vec3(48.0)), 1.0);
+}`;
+
 const SHAFT_FRAG = /* glsl */`
 varying vec2 vUv; varying vec3 vW; uniform float uTime; uniform vec3 uColor; uniform float uStrength;
 float h21(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
 float vn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f); return mix(mix(h21(i), h21(i+vec2(1,0)), f.x), mix(h21(i+vec2(0,1)), h21(i+vec2(1,1)), f.x), f.y); }
 void main(){
   float edge = smoothstep(0.0, 0.35, vUv.x) * smoothstep(1.0, 0.65, vUv.x);
-  float fall = smoothstep(0.0, 0.12, vUv.y) * pow(vUv.y, 0.7);
+  float uy = clamp(vUv.y, 0.0, 1.0);
+  float fall = smoothstep(0.0, 0.12, uy) * pow(uy, 0.7);
   float n = vn(vec2(vUv.x * 5.0 + vW.x * 0.3, vUv.y * 1.5 - uTime * 0.04)) * 0.6 + 0.4;
   gl_FragColor = vec4(uColor * edge * fall * n * uStrength, 1.0);
 }`;
@@ -112,6 +130,10 @@ export class Stage {
   indoor = 0;
   indoorTarget = 0;
   quality: Quality;
+  /** Touch-first device (phone/tablet). */
+  coarse = false;
+  /** Vertical field of view that keeps the horizontal view wide on narrow/portrait screens. */
+  baseFov = 78;
   private fog: THREE.FogExp2;
 
   constructor(canvas: HTMLCanvasElement, quality: Quality) {
@@ -168,13 +190,19 @@ export class Stage {
 
   setQuality(q: Quality) {
     this.quality = q;
-    const pr = Math.min(window.devicePixelRatio || 1, q === 'high' ? 1.5 : 1);
+    // phones have dense screens: the performance preset keeps a little extra sharpness there
+    const pr = Math.min(window.devicePixelRatio || 1, q === 'high' ? 1.5 : this.coarse ? 1.35 : 1);
     this.renderer.setPixelRatio(pr);
     if (q === 'high') {
       const size = this.renderer.getDrawingBufferSize(new THREE.Vector2());
       const rt = new THREE.WebGLRenderTarget(size.x, size.y, { type: THREE.HalfFloatType, samples: 4 });
       this.composer = new EffectComposer(this.renderer, rt);
       this.composer.addPass(new RenderPass(this.scene, this.camera));
+      this.composer.addPass(new ShaderPass({
+        uniforms: { tDiffuse: { value: null } },
+        vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+        fragmentShader: SANITIZE_FRAG,
+      }));
       this.bloom = new UnrealBloomPass(new THREE.Vector2(size.x / 2, size.y / 2), 0.4, 0.6, 0.9);
       this.composer.addPass(this.bloom);
       this.composer.addPass(new OutputPass());
@@ -197,6 +225,9 @@ export class Stage {
     const w = window.innerWidth, h = window.innerHeight;
     this.renderer.setSize(w, h, false);
     this.camera.aspect = w / h;
+    const hHalf = Math.atan(Math.tan((78 * Math.PI) / 360) * Math.min(w / h, 1.6));
+    this.baseFov = Math.min(100, Math.max(78, (2 * Math.atan(Math.tan(hHalf) / (w / h)) * 180) / Math.PI));
+    this.camera.fov = this.baseFov;
     this.camera.updateProjectionMatrix();
     this.composer?.setSize(w, h);
   }

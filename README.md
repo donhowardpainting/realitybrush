@@ -22,8 +22,22 @@ npm install
 npm run dev        # http://localhost:5173
 ```
 
-Controls: `WASD` move · `Shift` sprint · `Space` jump · `LMB` spray · `RMB`/`F` kinetic pulse ·
-`1`–`5`/wheel select pigment · `Q` solvent · `R` return to checkpoint · `Esc` pause.
+It plays with keyboard and mouse, a gamepad, or touch — the game switches prompts to whichever
+you are using.
+
+| | Keyboard + mouse | Gamepad | Touch |
+| --- | --- | --- | --- |
+| Move / look | `WASD` / mouse | left / right stick | left thumb / drag on the right |
+| Sprint / jump | `Shift` / `Space` | `L3` / `A` | push the stick past its ring / `JUMP` |
+| Spray | `LMB` | `RT` | hold `SPRAY` (drag it to keep aiming) |
+| Paint bomb | `E` | `X` | `BOMB` |
+| Kinetic pulse | `RMB` or `F` | `LT` | `PULSE` |
+| Pigment / solvent | `1`–`5`, wheel / `Q` | `LB` `RB` / `B` | tap the hotbar |
+| Pause | `Esc` | `Start` | pause button |
+
+`R` returns to the last checkpoint (also in the pause menu). The paint bomb throws one large
+splash of the selected pigment on a short cooldown. A diamond marker points at the current
+objective, and nine optional echo shards are hidden where a little creative painting gets you.
 
 The story runs through three connected districts — the Research Courtyard, the Machine Works and
 the Gravity Tower — with checkpoints and automatic saving (localStorage). The **Sandbox** on the
@@ -54,10 +68,11 @@ npm run build && npm test          # all gameplay tests
 npm test -- ice                    # only tests whose name contains "ice"
 ```
 
-`tests/run.mjs` drives the real game headlessly (Playwright + Chromium, software WebGL). Twenty
+`tests/run.mjs` drives the real game headlessly (Playwright + Chromium, software WebGL). Twenty-four
 tests assert that each pigment changes behaviour, that combinations work (float + mag-line,
 growth + bounce, float + pulse, stacking), that every gate of the story can be passed, and that
-checkpoints, respawning, save/continue and restart function. One test plays the opening with no
+checkpoints, respawning, save/continue and restart function. Gamepad input is driven through a
+mocked controller and touch through a phone-sized touch context. One test plays the opening with no
 shortcuts — walking, jumping, aiming and spraying — to confirm the first set piece is reachable
 inside a minute. Playwright is expected to be available in the
 environment (`npm i -D playwright` otherwise).
