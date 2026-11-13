@@ -71,6 +71,7 @@ function vault(b: Builder, id: string, x0: number, z1: number, y0: number, need:
   b.dbox(x0 + 0.5, x0 + 0.6, y0, y0 + 2.5, z1, z1 + 0.06, b.glowKey(PAINTS[need].hex, 1.6));
   b.dbox(x0 + 2.2, x0 + 2.3, y0, y0 + 2.5, z1, z1 + 0.06, b.glowKey(PAINTS[need].hex, 1.6));
   b.lamp(x0 + 2.5, y0 + 2.7, z0 + 2, PAINTS[need].hex, 3, 7, 0.1);
+  b.conduit([[x0 + 3.6, y0 + 0.02, z1 + 0.45], [x0 + 1.4, y0 + 0.02, z1 + 0.45]], () => r.on, PAINTS[need].hex);
   return V(x0 + 2.5, y0, z0 + 2);
 }
 
@@ -563,6 +564,69 @@ export function buildWorld(game: Game, b: Builder): LevelDef {
   zones.addTrigger('hub', -3.5, 3.5, 45.2, 50, TZ - 3.5, TZ + 3.5);
   b.sign(['STAGE 4', 'FIVE LOCKS · FIVE COLOURS'], 10.95, 49.4, -199, 'x-', 3.4, 0.9, '#e8e2d0');
 
+  /* ---- indicator lines: every switch shows what it drives ---- */
+  const RED = PAINTS[Paint.Red].hex;
+  b.conduit([[5.4, 0.02, -111.45], [0, 0.02, -111.45]], () => rDoor.on, RED);
+  b.conduit([[-6.6, 0.02, -118.4], [-8, 0.02, -118.4], [-8, 0.02, -156.4]], beltsOn, RED);
+  b.conduit([[-8, 0.02, -157.2], [-8, 0.02, -152.6], [18.9, 0.02, -152.6], [18.9, 0.02, -142.6]], busOn, 0xffa040);
+  b.conduit([[19.93, 8.6, -161.5], [19.93, 8.06, -161.5], [19.93, 8.06, -163.4]], () => rLift.on, RED);
+  b.conduit([[-10.93, 28.4, -202.9], [-10.93, 28.4, -206]], () => rRail.on, RED);
+  b.conduit([[10.93, 45.9, -195.4], [10.93, 45.06, -195.4], [7.4, 45.06, -198.4]], () => rRotor.on, RED);
+
+  /* ---- chamber boards: where you are, and what the brush can do so far ---- */
+  const boards: (() => void)[] = [];
+  const board = (num: string, name: string, x: number, y: number, z: number, side: 'z+' | 'z-' | 'x+' | 'x-') => {
+    boards.push(b.panel(x, y, z, side, 2.2, 3.3, (g, w, h) => {
+      g.fillStyle = '#e9ebe6'; g.fillRect(0, 0, w, h);
+      g.fillStyle = '#15171b';
+      g.font = `800 ${w * 0.5}px "Trebuchet MS", "Segoe UI", sans-serif`; g.textBaseline = 'alphabetic'; g.textAlign = 'left';
+      g.fillText(num, w * 0.08, h * 0.4);
+      g.fillRect(w * 0.08, h * 0.45, w * 0.84, h * 0.012);
+      g.font = `700 ${w * 0.075}px "Trebuchet MS", "Segoe UI", sans-serif`;
+      g.fillText(name, w * 0.08, h * 0.53, w * 0.84);
+      // one cell per pigment: filled in once the brush carries it
+      PAINT_ORDER.forEach((p, i) => {
+        const cx = w * (0.14 + i * 0.18), cy = h * 0.68, r = w * 0.065;
+        g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2);
+        if (game.unlocked.has(p)) { g.fillStyle = PAINTS[p].css; g.fill(); }
+        g.lineWidth = w * 0.012; g.strokeStyle = '#15171b'; g.stroke();
+      });
+      g.fillStyle = '#15171b';
+      g.font = `600 ${w * 0.05}px "Trebuchet MS", "Segoe UI", sans-serif`;
+      g.fillText(`PIGMENTS  ${game.unlocked.size} / 5`, w * 0.08, h * 0.82);
+      g.fillText(`ECHO SHARDS  ${game.shardCount} / ${zones.shards.length}`, w * 0.08, h * 0.89);
+      for (let i = 0; i < 12; i++) { g.fillStyle = i % 2 ? '#15171b' : '#e9ebe6'; g.fillRect(w * (0.08 + i * 0.07), h * 0.935, w * 0.07, h * 0.02); }
+    }));
+  };
+  board('01', 'RESEARCH COURTYARD', 5.6, 2.3, 9.72, 'z-');
+  board('02', 'MACHINE WORKS', -8.2, 2.3, -111.72, 'z+');
+  board('03', 'GRAVITY TOWER', 5.4, 21.2, -187.22, 'z+');
+  const redrawBoards = () => { for (const r of boards) r(); };
+  for (const k of ['yellow', 'blue', 'red', 'green']) game.on('pickup:' + k, redrawBoards);
+  for (let i = 0; i < 16; i++) game.on('shard:' + i, redrawBoards);
+
+  /* ---- calibration fields: a shimmer of the loaded pigment across key thresholds ---- */
+  const fieldU = { uTime: timeUniform, uColor: { value: new THREE.Color(PAINTS[Paint.Purple].hex) } };
+  const fieldMat = new THREE.ShaderMaterial({
+    uniforms: fieldU,
+    vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+    fragmentShader: `varying vec2 vUv; uniform float uTime; uniform vec3 uColor;
+      float h(vec2 p){ return fract(sin(dot(p, vec2(41.3, 289.1))) * 43758.5); }
+      float n(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f); return mix(mix(h(i), h(i+vec2(1,0)), f.x), mix(h(i+vec2(0,1)), h(i+vec2(1,1)), f.x), f.y); }
+      void main(){ vec2 uv = clamp(vUv, 0.0, 1.0);
+        float lines = smoothstep(0.55, 0.95, n(vec2(uv.x * 46.0, uv.y * 5.0 - uTime * 0.7)));
+        float e = clamp(1.0 - min(min(uv.x, 1.0 - uv.x), min(uv.y, 1.0 - uv.y)) * 7.0, 0.0, 1.0);
+        float sp = step(0.988, h(floor(uv * vec2(54.0, 54.0)) + floor(uTime * 7.0)));
+        gl_FragColor = vec4(uColor * (lines * 0.07 + e * e * 0.22 + sp * 0.5), 1.0); }`,
+    blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, side: THREE.DoubleSide, fog: false,
+  });
+  for (const [x, y, z, w, hh] of [[0, 1.55, 10.6, 3.2, 3.1], [0, 20.5, -188.25, 5, 3]]) {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, hh), fieldMat); m.position.set(x, y, z); scene.add(m);
+  }
+  let boardT = 0;
+  frames.push((dt) => { if ((boardT -= dt) <= 0) { boardT = 3; redrawBoards(); } });
+  frames.push((dt) => { fieldU.uColor.value.lerp(PAINTS[game.gun.selected].color, Math.min(1, dt * 4)); });
+
   /* ---- distant skyline ---- */
   {
     const c = document.createElement('canvas'); c.width = 64; c.height = 128;
@@ -718,6 +782,7 @@ export function buildWorld(game: Game, b: Builder): LevelDef {
       'zone:roof': ['THE GRAVITY TOWER', 'IT IS STILL RUNNING'],
     },
     restoreState(seen) {
+      redrawBoards();
       const on = (id: string) => { const r = power.receptor(id); r.p.fill(r.need); r.powered = true; game.paint.markDirty(r.p); };
       for (const r of power.receptors) if (!r.id.startsWith('lock') && seen.has('power:' + r.id)) on(r.id);
       if (seen.has('socket:core')) socket.force(game, core);

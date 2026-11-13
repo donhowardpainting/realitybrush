@@ -63,8 +63,8 @@ export class Gun {
   }
 
   private buildModel() {
-    const body = new THREE.MeshStandardMaterial({ color: 0x23262c, roughness: 0.34, metalness: 0.85 });
-    const trim = new THREE.MeshStandardMaterial({ color: 0xcfc8b8, roughness: 0.55, metalness: 0.15 });
+    const body = new THREE.MeshStandardMaterial({ color: 0x1c1f24, roughness: 0.34, metalness: 0.85 });
+    const trim = new THREE.MeshPhysicalMaterial({ color: 0xeceae4, roughness: 0.22, metalness: 0.0, clearcoat: 1, clearcoatRoughness: 0.08 });
     const dark = new THREE.MeshStandardMaterial({ color: 0x0c0d10, roughness: 0.65, metalness: 0.4 });
     const steel = new THREE.MeshStandardMaterial({ color: 0x8a8f96, roughness: 0.25, metalness: 1 });
     const tint = (k = 1) => { const m = new THREE.MeshStandardMaterial({ color: 0x0a0a0a, emissive: 0xffffff, emissiveIntensity: 1.2, roughness: 0.35 }); m.userData.k = k; this.tintMats.push(m); return m; };
@@ -74,8 +74,17 @@ export class Gun {
     const H = Math.PI / 2;
     // receiver
     add(new THREE.BoxGeometry(0.085, 0.1, 0.3), body, 0, 0, 0.02);
-    add(new THREE.BoxGeometry(0.09, 0.018, 0.24), trim, 0, 0.056, 0.03);
-    add(new THREE.BoxGeometry(0.092, 0.03, 0.1), trim, 0, -0.02, -0.07);
+    // enamel shell wrapped over the chassis
+    add(new THREE.BoxGeometry(0.094, 0.05, 0.25), trim, 0, 0.04, 0.035);
+    add(new THREE.BoxGeometry(0.096, 0.06, 0.09), trim, 0, 0.0, -0.085);
+    add(new THREE.CylinderGeometry(0.036, 0.036, 0.1, 16), trim, 0, 0.005, -0.165, H);
+    // three emitter prongs around the nozzle
+    for (let i = 0; i < 3; i++) {
+      const a = (i / 3) * Math.PI * 2 + Math.PI / 2;
+      const pr = add(new THREE.BoxGeometry(0.012, 0.012, 0.11), trim, Math.cos(a) * 0.052, 0.005 + Math.sin(a) * 0.052, -0.44);
+      pr.rotation.z = a;
+      add(new THREE.BoxGeometry(0.014, 0.014, 0.018), tint(1.4), Math.cos(a) * 0.05, 0.005 + Math.sin(a) * 0.05, -0.498);
+    }
     add(new THREE.BoxGeometry(0.05, 0.13, 0.055), dark, 0, -0.105, 0.125, 0.4);
     add(new THREE.TorusGeometry(0.032, 0.006, 6, 14, Math.PI), dark, 0, -0.055, 0.035, 0, H, Math.PI);
     add(new THREE.BoxGeometry(0.004, 0.012, 0.2), tint(0.9), 0.0435, 0.02, 0.02);

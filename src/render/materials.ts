@@ -100,7 +100,9 @@ export class Materials {
       const pit = sstep(0.72, 0.8, fbm(u, v, 40, 2, 9));
       let c = 0.46 + (n - 0.5) * 0.28 + (fine - 0.5) * 0.12 - sstep(0.55, 0.8, streak) * 0.12;
       c *= lerp(0.6, 1, sm) * (1 - pit * 0.25);
-      return { r: c * 1.0, g: c * 1.0, b: c * 0.96, h: (n * 0.4 + fine * 0.3) * sm - pit * 0.4, rough: 0.82 + fine * 0.15 };
+      const wet = sstep(0.56, 0.7, fbm(u, v, 3, 3, 7)) * sm;
+      c *= 1 - wet * 0.3;
+      return { r: c * 1.0, g: c * 1.0, b: c * 0.96, h: ((n * 0.4 + fine * 0.3) * sm - pit * 0.4) * (1 - wet * 0.8), rough: lerp(0.82 + fine * 0.15, 0.1, wet) };
     }), { metalness: 0 });
 
     mk('pavers', build(S, (u, v) => {
@@ -115,7 +117,9 @@ export class Materials {
       const mossy = sstep(0.5, 0.75, fbm(u, v, 6, 4, 13)) * 0.8;
       const moss = gap * 0.9 + sstep(0.012, 0.03, 0.03 - g + 0.012) * mossy * 0.6;
       const r = lerp(c * 1.02, 0.16, moss), gg = lerp(c, 0.23, moss), b = lerp(c * 0.95, 0.12, moss);
-      return { r, g: gg, b, h: (1 - gap) * (0.6 + n * 0.3), rough: 0.88 };
+      const wet = sstep(0.55, 0.68, fbm(u, v, 3, 3, 17)) * (1 - gap * 0.5);
+      const dk = 1 - wet * 0.35;
+      return { r: r * dk, g: gg * dk, b: b * dk, h: (1 - gap) * (0.6 + n * 0.3) * (1 - wet * 0.85), rough: lerp(0.88, 0.07, wet) };
     }), { metalness: 0 });
 
     mk('rust', build(S, (u, v) => {
@@ -204,14 +208,17 @@ export class Materials {
       return { r, g, b, h: n * 0.2, rough: 0.7, metal: 0.3 };
     }), { metalness: 1 });
 
+    // Test-chamber panelling: bright enamel squares with shadowed seams, a little worn at the joints.
     mk('lab', build(S, (u, v) => {
-      const seam = Math.min(gridLine(u, 2), gridLine(v, 2));
-      const sm = sstep(0.003, 0.01, seam);
-      const n = fbm(u, v, 5, 4, 91), fine = fbm(u, v, 40, 2, 92);
-      const grime = sstep(0.5, 0.85, fbm(u * 4, v * 0.7, 4, 4, 93)) * 0.2 + sstep(0.6, 0.8, n) * 0.1;
-      const c = (0.62 - grime + fine * 0.05) * lerp(0.5, 1, sm);
-      return { r: c * 0.97, g: c, b: c * 1.02, h: sm * 0.5, rough: 0.35 + grime + fine * 0.1, metal: 0.1 };
-    }), { metalness: 1 });
+      const cells = 2;
+      const gx = gridLine(u, cells), gy = gridLine(v, cells), seam = Math.min(gx, gy);
+      const groove = sstep(0.004, 0.011, seam), bevel = sstep(0.011, 0.045, seam);
+      const id = hash2(Math.floor(u * cells), Math.floor(v * cells), 94);
+      const n = fbm(u, v, 5, 4, 91), fine = fbm(u, v, 44, 2, 92);
+      const grime = sstep(0.5, 0.9, fbm(u * 3, v * 0.6, 4, 4, 93)) * 0.12 * (1 - bevel * 0.4) + (1 - bevel) * 0.1 + sstep(0.62, 0.8, n) * 0.05;
+      const c = (0.8 + (id - 0.5) * 0.07 - grime + fine * 0.02) * lerp(0.28, 1, groove);
+      return { r: c * 0.985, g: c, b: c * 1.01, h: groove * 0.7 + bevel * 0.3, rough: 0.2 + grime * 1.6 + fine * 0.06, metal: 0.05 };
+    }, 2.2), { metalness: 1 });
 
     mk('alloy', build(S, (u, v) => {
       const seam = Math.min(gridLine(u, 2), gridLine(v, 4));
@@ -223,17 +230,24 @@ export class Materials {
       return { r: c * 0.93, g: c * 0.96, b: c * 1.22, h: sm * 0.6 + fine * 0.08, rough: 0.4 + n * 0.22, metal: 0.8, e: node };
     }, 2.5, true), { metalness: 1, emissive: 0x8a6cff, emissiveIntensity: 1.2 });
 
+    // Test crate: pale shell plates in a dark frame, with a lit diamond at the centre of each face.
     mk('crate', build(S, (u, v) => {
       const edge = Math.min(u, 1 - u, v, 1 - v);
-      const frame = 1 - sstep(0.085, 0.095, edge);
-      const diag = Math.abs(u - v) < 0.045 || Math.abs(u + v - 1) < 0.045 ? 1 : 0;
+      const frame = 1 - sstep(0.1, 0.11, edge);
+      const cu = Math.abs(u - 0.5), cv = Math.abs(v - 0.5);
+      const corner = cu > 0.3 && cv > 0.3 ? 1 : 0;
+      const dia = cu + cv;
+      const emblem = 1 - sstep(0.012, 0.03, Math.abs(dia - 0.2));
+      const core = 1 - sstep(0.07, 0.085, dia);
+      const seam = 1 - sstep(0.0, 0.012, Math.min(cu, cv)) * 1;
       const n = fbm(u, v, 6, 4, 111), fine = fbm(u, v, 40, 2, 112);
-      const wear = sstep(0.55, 0.7, n + (fine - 0.5) * 0.3);
-      const raised = Math.max(frame, diag * (1 - frame));
-      const baseR = lerp(0.55, 0.3, wear), baseG = lerp(0.47, 0.22, wear), baseB = lerp(0.3, 0.16, wear);
-      const k = raised ? 0.5 + fine * 0.1 : 1;
-      return { r: baseR * k, g: baseG * k, b: baseB * k * (raised ? 1.3 : 1), h: raised * 0.8 + fine * 0.1, rough: lerp(0.5, 0.85, wear), metal: raised ? 0.8 : 0.3 };
-    }), { metalness: 1 });
+      const wear = sstep(0.6, 0.75, n + (fine - 0.5) * 0.3) * 0.25;
+      const dark = Math.max(frame, corner);
+      let c = dark ? 0.1 + fine * 0.04 : 0.66 - wear + fine * 0.04;
+      if (!dark && seam > 0.5 && dia > 0.24) c *= 0.55;
+      const e = dark ? 0 : Math.max(emblem, core * 0.8);
+      return { r: c * 0.98 + e * 0.1, g: c + e * 0.2, b: c * 1.03 + e * 0.25, h: (dark ? 0.9 : 0.5) - e * 0.3 + fine * 0.05, rough: dark ? 0.6 : 0.3 + wear, metal: dark ? 0.7 : 0.15, e };
+    }, 2.5, true), { metalness: 1, emissive: 0x7fe6ff, emissiveIntensity: 1.5 });
 
     mk('core', build(S, (u, v) => {
       const cu = Math.abs(u - 0.5), cv = Math.abs(v - 0.5);

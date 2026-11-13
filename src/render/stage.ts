@@ -62,7 +62,7 @@ void main(){
   col *= mix(shadowTint, hiTint, smoothstep(0.1, 0.8, l));
   col = (col - 0.5) * mix(1.06, 1.1, uRestore) + 0.5;
   col *= 1.0 - smoothstep(0.18, 0.75, r2) * 0.55;
-  col += (h(uv * 800.0 + fract(uTime) * 91.0) - 0.5) * 0.028;
+  col += (h(uv * 800.0 + fract(uTime) * 91.0) - 0.5) * 0.016;
   col += uFlashColor * uFlash;
   col *= 1.0 - uFade;
   float bar = step(uv.y, uBars * 0.11) + step(1.0 - uBars * 0.11, uv.y);
@@ -142,7 +142,7 @@ export class Stage {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.0;
+    this.renderer.toneMappingExposure = 1.08;
     this.camera = new THREE.PerspectiveCamera(78, 1, 0.04, 900);
     this.camera.rotation.order = 'YXZ';
     this.scene.add(this.camera);

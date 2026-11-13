@@ -50,6 +50,7 @@ ${paint ? `uniform sampler2D uPaintTex;
 uniform vec3 uPaintHalf;
 uniform float uPaintInset;` : ''}
 float gPaintM = 0.0;
+float gPaintH = 0.0;
 vec3 gPaintC = vec3(0.0);
 float rbHash(vec3 p){ p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
 float rbNoise(vec3 x){
@@ -70,11 +71,26 @@ ${paint ? `{
   float n2 = rbNoise(vPLocal * 2.3 + 7.0);
   gPaintM = smoothstep(0.36, 0.6, pt.a + (n1 - 0.5) * 0.5 + (n2 - 0.5) * 0.25);
   gPaintC = pt.rgb / max(pt.a, 0.004);
+  // thickness profile: a rounded lip at the edge, gentle swells inside
+  gPaintH = smoothstep(0.0, 1.0, gPaintM) * (0.78 + 0.22 * rbNoise(vPLocal * 5.0 + 3.0));
   float rim = smoothstep(0.0, 0.5, gPaintM) * (1.0 - smoothstep(0.5, 1.0, gPaintM));
   diffuseColor.rgb = mix(diffuseColor.rgb, gPaintC * (0.8 + 0.25 * n2) * (1.0 - 0.35 * rim), gPaintM);
 }` : ''}`)
       .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
-roughnessFactor = mix(roughnessFactor, 0.16, gPaintM);`)
+roughnessFactor = mix(roughnessFactor, 0.07, gPaintM);`)
+      .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+// The paint has body: bump the shading normal from its thickness so highlights wrap the lip of
+// every splat and it reads as poured gel instead of a decal.
+if (gPaintM > 0.002) {
+  // start from the smooth geometric normal: a coat of gel buries the grout lines and rivets beneath it
+  vec3 pBase = nonPerturbedNormal;
+  vec3 pSx = dFdx(-vViewPosition), pSy = dFdy(-vViewPosition);
+  vec3 pR1 = cross(pSy, pBase), pR2 = cross(pBase, pSx);
+  float pDet = dot(pSx, pR1);
+  vec3 pGrad = sign(pDet) * (dFdx(gPaintH) * pR1 + dFdy(gPaintH) * pR2);
+  vec3 pN = abs(pDet) * pBase - 0.05 * pGrad;
+  normal = normalize(mix(normal, dot(pN, pN) > 1e-12 ? normalize(pN) : pBase, min(1.0, gPaintM * 1.15)));
+}`)
       .replace('#include <metalnessmap_fragment>', `#include <metalnessmap_fragment>
 metalnessFactor = mix(metalnessFactor, 0.0, gPaintM);`)
       .replace('#include <aomap_fragment>', `#include <aomap_fragment>
@@ -88,7 +104,7 @@ metalnessFactor = mix(metalnessFactor, 0.0, gPaintM);`)
 #endif`)
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
 totalEmissiveRadiance += diffuseColor.rgb * vBaked;
-totalEmissiveRadiance += gPaintC * gPaintM * (0.2 + 0.1 * sin(uTime * 2.2 + rbNoise(vPLocal * 1.3) * 12.0));`);
+totalEmissiveRadiance += gPaintC * gPaintM * (0.16 + 0.08 * sin(uTime * 2.2 + rbNoise(vPLocal * 1.3) * 12.0));`);
   };
   mat.customProgramCacheKey = () => (paint ? 'rb-paint' : 'rb-world');
 }

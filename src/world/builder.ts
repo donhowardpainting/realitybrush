@@ -400,6 +400,54 @@ export class Builder {
     return c;
   }
 
+  /**
+   * Indicator line: a trail of small lights from a switch to the thing it drives. Dim and cool
+   * while idle, lit in the pigment's colour once energised — the room explains its own wiring.
+   */
+  conduit(pts: [number, number, number][], isOn: () => boolean, onHex: number) {
+    const geos: THREE.BufferGeometry[] = [];
+    let carry = 0;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const a = V(...pts[i]), c = V(...pts[i + 1]), len = a.distanceTo(c);
+      for (let d = carry; d <= len; d += 0.46) {
+        const g = new THREE.BoxGeometry(0.13, 0.13, 0.13);
+        const p = a.clone().lerp(c, len ? d / len : 0);
+        g.translate(p.x, p.y, p.z);
+        geos.push(g);
+      }
+      carry = 0.46 - ((len - carry) % 0.46);
+    }
+    const mat = new THREE.MeshStandardMaterial({ color: 0x08090b, emissive: 0x4fb8ff, emissiveIntensity: 0.9, roughness: 0.4 });
+    const mesh = new THREE.Mesh(mergeGeometries(geos, false)!, mat);
+    this.game.stage.scene.add(mesh);
+    const off = new THREE.Color(0x4fb8ff), on = new THREE.Color(onHex);
+    let k = 0;
+    this.animators.push((dt, t) => {
+      k += ((isOn() ? 1 : 0) - k) * Math.min(1, dt * 3);
+      mat.emissive.copy(off).lerp(on, k);
+      mat.emissiveIntensity = 0.7 + k * 2.6 + Math.sin(t * 3) * 0.15 * (1 - k);
+    });
+  }
+
+  /** Back-lit information panel drawn with a callback; call the returned function to redraw it. */
+  panel(x: number, y: number, z: number, side: Side, w: number, h: number, draw: (g: CanvasRenderingContext2D, w: number, h: number) => void): () => void {
+    const c = document.createElement('canvas');
+    c.width = 512; c.height = Math.round((512 * h) / w);
+    const g = c.getContext('2d')!;
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
+    const mat = new THREE.MeshStandardMaterial({ map: tex, emissiveMap: tex, emissive: 0xffffff, emissiveIntensity: 0.3, roughness: 0.35 });
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
+    const frame = new THREE.Mesh(new THREE.BoxGeometry(w + 0.16, h + 0.16, 0.08), new THREE.MeshStandardMaterial({ color: 0x101216, roughness: 0.5, metalness: 0.7 }));
+    frame.position.z = -0.045; m.add(frame);
+    m.position.set(x, y, z);
+    m.rotation.y = side === 'z+' ? 0 : side === 'z-' ? Math.PI : side === 'x+' ? Math.PI / 2 : -Math.PI / 2;
+    this.game.stage.scene.add(m);
+    const redraw = () => { draw(g, c.width, c.height); tex.needsUpdate = true; };
+    redraw();
+    return redraw;
+  }
+
   mover(p: Paintable, to: THREE.Vector3, speed: number, mode: 'hold' | 'loop', active: () => boolean, pause = 1.2, sound = false): Mover {
     const t = p.body.translation();
     const m = new Mover(p, V(t.x, t.y, t.z), to, speed, mode, active, pause, sound);
